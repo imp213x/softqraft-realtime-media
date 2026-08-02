@@ -22,34 +22,38 @@ Use this to close Phase 2. Tick items as verified.
 
 ---
 
-## B. AWS S3 Echo path (Clatters production shape)
+## B. Local Clatters dual-run (MinIO — **preferred first**)
+
+**No production bucket.** SoftQraft + Clatters + MinIO on one machine.
+
+Guide: [local-clatters-dual-run.md](local-clatters-dual-run.md)  
+Clatters env: [../../examples/clatters-integration/env.local-minio.example](../../examples/clatters-integration/env.local-minio.example)
 
 | # | Item | Status |
 |---|------|--------|
-| B1 | Gateway/Egress env for real AWS (no MinIO endpoint) | ⬜ |
-| B2 | Key template `live-echo/{externalId}/{sessionId}-{time}.mp4` | ⬜ |
-| B3 | IAM write to `live-echo/*` on Clatters bucket | ⬜ |
-| B4 | One staging MP4 lands in AWS under `live-echo/` | ⬜ |
-
-Env template: [../../deploy/env/aws-echo.env.example](../../deploy/env/aws-echo.env.example)
+| B1 | SoftQraft Compose up + `sync-livekit-node-ip` | ⬜ |
+| B2 | `WEBHOOK_FORWARD_URLS` → `host.docker.internal:3000/.../egress-webhook` | ⬜ |
+| B3 | Clatters `.env` → SoftQraft LiveKit + MinIO `LIVEKIT_EGRESS_S3_*` | ⬜ |
+| B4 | Confirm **no** prod AWS keys in local Clatters env | ⬜ |
+| B5 | Two local users; host Go Live + viewer watch | ⬜ |
+| B6 | Echo MP4 in MinIO under `live-echo/…` | ⬜ |
+| B7 | Clatters Echo/replay finalize (webhook) | ⬜ |
 
 ---
 
-## C. Clatters staging dual-run
+## C. Staging dual-run (optional later — still not prod bucket)
+
+Use a **non-production** bucket or prefix. Avoid `thescholar-uploads` until intentional.
 
 | # | Item | Status |
 |---|------|--------|
-| C1 | Staging SoftQraft reachable (`wss` + UDP/TCP media) | ⬜ |
-| C2 | Clatters staging `LIVEKIT_URL` / key / secret → SoftQraft | ⬜ |
-| C3 | `LIVEKIT_EGRESS_AUTO=true` + S3 unchanged (AWS) | ⬜ |
-| C4 | Webhooks: SoftQraft → Clatters `/api/livekit/egress-webhook` | ⬜ |
-| C5 | Host Go Live + publish | ⬜ |
-| C6 | Audience watch (WebRTC) | ⬜ |
-| C7 | Stage guest (if used) | ⬜ |
-| C8 | Echo finalize + playable replay in Clatters | ⬜ |
-| C9 | Rollback drill: restore Cloud `LIVEKIT_*` | ⬜ |
+| C1 | SoftQraft staging host + TLS | ⬜ |
+| C2 | Staging/non-prod S3 (or MinIO remote) | ⬜ |
+| C3 | Clatters staging `LIVEKIT_*` → SoftQraft | ⬜ |
+| C4 | Full live + Echo soak | ⬜ |
+| C5 | Rollback drill to LiveKit Cloud | ⬜ |
 
-Env: [../../examples/clatters-integration/env.dual-run.example](../../examples/clatters-integration/env.dual-run.example)
+Prod AWS template (when ready): [../../deploy/env/aws-echo.env.example](../../deploy/env/aws-echo.env.example)
 
 ---
 
@@ -60,6 +64,5 @@ Env: [../../examples/clatters-integration/env.dual-run.example](../../examples/c
 | SoftQraft | | | |
 | Clatters | | | |
 
-**Phase 2 complete when:** B4 + C5–C8 + C9 are checked.
-
-Then proceed to **Phase 3** (HLS/CDN) and/or **Phase 4** (production % cutover).
+**Phase 2 local gate:** B5–B7 checked.  
+**Phase 2 full:** also C items if you use staging before prod.

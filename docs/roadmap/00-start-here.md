@@ -47,22 +47,26 @@ Runbooks:
 
 ## Phase 2 — what “done” means
 
-Close Phase 2 when:
+**Preferred path (safe):** local Clatters + SoftQraft + **MinIO** (no production S3).
 
-1. SoftQraft can write Echo to **AWS S3** with Clatters key template `live-echo/…`  
-2. Clatters **staging** points `LIVEKIT_*` at SoftQraft  
-3. Webhooks reach Clatters Echo finalize (direct or `WEBHOOK_FORWARD_URLS`)  
-4. Staging checklist signed (host / stage guest / viewer / replay)
+Close Phase 2 **local gate** when:
 
-Tracking: [../operations/phase-2-checklist.md](../operations/phase-2-checklist.md)  
-Runbook: [../operations/phase-2-dual-run.md](../operations/phase-2-dual-run.md)
+1. Clatters local `LIVEKIT_*` → SoftQraft  
+2. Echo writes to **MinIO** under `live-echo/…` (Clatters template)  
+3. Two local users: host + viewer  
+4. Webhook finalize works (or explicit poll path)  
+
+Guide: [../operations/local-clatters-dual-run.md](../operations/local-clatters-dual-run.md)  
+Checklist: [../operations/phase-2-checklist.md](../operations/phase-2-checklist.md)
+
+**Later (still not prod bucket first):** staging SoftQraft + non-prod object storage → then prod AWS (ADR-006).
 
 ---
 
 ## Next work (in order)
 
-1. **AWS S3 Echo profile** for dual-run (env + compose notes)  
-2. **Clatters staging** dual-run  
+1. **Local Clatters dual-run on MinIO** (two users)  
+2. Optional non-prod staging  
 3. Optional: HLS profile (Phase 3) once dual-run is stable  
 
 ---

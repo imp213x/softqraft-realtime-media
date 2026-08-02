@@ -11,16 +11,22 @@ SoftQraft Realtime Media is **app-agnostic**. This folder only documents how **C
 | [../../docs/integration/consumers/the-scholar-clatters-inventory.md](../../docs/integration/consumers/the-scholar-clatters-inventory.md) | Production inventory |
 | [../../docs/operations/phase-2-dual-run.md](../../docs/operations/phase-2-dual-run.md) | Dual-run runbook |
 
-## Fastest path (recommended first)
+## Fastest path (recommended first) — **local MinIO, no prod S3**
 
-1. Run SoftQraft Compose (or production VMs).  
-2. Configure SoftQraft Egress/Gateway S3 → **same AWS bucket** as Clatters Echo.  
-3. Set Clatters `LIVEKIT_URL` + API key/secret to SoftQraft.  
-4. Forward webhooks: SoftQraft Gateway `WEBHOOK_FORWARD_URLS` → Clatters `/api/livekit/egress-webhook`.  
-5. Dogfood Live on staging; then % cutover.
+1. SoftQraft Compose up (LiveKit + Egress + MinIO).  
+2. Clatters local env from [env.local-minio.example](./env.local-minio.example).  
+3. SoftQraft `WEBHOOK_FORWARD_URLS` → Clatters `:3000` webhook.  
+4. Two local users → Go Live + watch + Echo in MinIO `live-echo/…`.  
+
+Full guide: [../../docs/operations/local-clatters-dual-run.md](../../docs/operations/local-clatters-dual-run.md)
+
+## Later (not first)
+
+- Staging SoftQraft + **non-prod** bucket  
+- Production AWS `thescholar-uploads` only when intentional ([env.dual-run.example](./env.dual-run.example))
 
 ## Do not
 
+- Point local dual-run at the **production** S3 bucket  
 - Put LiveKit API secrets in mobile apps  
-- Change Nest/Echo domain models inside SoftQraft core  
-- Move Echo off AWS in the same cutover as realtime (unless intentional)  
+- Change Nest/Echo domain models inside SoftQraft core
