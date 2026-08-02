@@ -15,10 +15,12 @@ $headers = @{
 
 function Invoke-Json {
   param([string]$Method, [string]$Url, [string]$Body = $null)
-  if ($Body) {
+  if ($null -ne $Body) {
     return Invoke-RestMethod -Uri $Url -Method $Method -Headers $headers -Body $Body
   }
-  return Invoke-RestMethod -Uri $Url -Method $Method -Headers $headers
+  # Fastify rejects Content-Type: application/json with an empty body
+  $getHeaders = @{ Authorization = "Bearer $ApiKey" }
+  return Invoke-RestMethod -Uri $Url -Method $Method -Headers $getHeaders
 }
 
 Write-Host "== health =="
@@ -87,6 +89,6 @@ try {
 }
 
 Write-Host "== end session =="
-Invoke-Json -Method POST -Url "$BaseUrl/v1/sessions/$sessionId/end" | ConvertTo-Json -Depth 5
+Invoke-Json -Method POST -Url "$BaseUrl/v1/sessions/$sessionId/end" -Body "{}" | ConvertTo-Json -Depth 5
 
 Write-Host "Phase 1 smoke finished." -ForegroundColor Green

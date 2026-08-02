@@ -8,8 +8,9 @@ bind_addresses:
 
 rtc:
   tcp_port: 7881
-  port_range_start: 50000
-  port_range_end: 50100
+  # Avoid common Windows/app UDP ranges (50000+) that often conflict
+  port_range_start: 52000
+  port_range_end: 52100
   # Local browser on same machine: false. Remote clients / VMs: true or set node_ip.
   use_external_ip: false
   # node_ip: 203.0.113.10

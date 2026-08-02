@@ -1,0 +1,17 @@
+**/node_modules
+**/dist
+**/.git
+**/*.tsbuildinfo
+**/coverage
+**/.env
+**/.env.*
+deploy/compose/.env
+**/*.md
+!README.md
+docs
+examples
+e2e
+.git
+.pnpm-store
+**/.DS_Store
+**/Thumbs.db
