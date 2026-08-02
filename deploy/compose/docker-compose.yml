@@ -119,6 +119,8 @@ services:
       S3_ENDPOINT: http://minio:9000
       S3_FORCE_PATH_STYLE: "true"
       RECORDING_KEY_TEMPLATE: ${RECORDING_KEY_TEMPLATE:-recordings/{externalId}/{sessionId}-{time}.mp4}
+      # Comma-separated consumer webhook URLs (e.g. Clatters Echo finalize)
+      WEBHOOK_FORWARD_URLS: ${WEBHOOK_FORWARD_URLS:-}
     ports:
       - "8080:8080"
 

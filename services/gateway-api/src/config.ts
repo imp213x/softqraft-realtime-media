@@ -21,6 +21,11 @@ export interface GatewayConfig {
   s3: S3Config | null;
   recordingKeyTemplate: string;
   defaultTokenTtlSeconds: number;
+  /**
+   * Optional consumer webhook URLs (e.g. Clatters /api/livekit/egress-webhook).
+   * LiveKit webhooks are verified then forwarded with the original signature.
+   */
+  webhookForwardUrls: string[];
 }
 
 function env(name: string, fallback = ""): string {
@@ -100,5 +105,9 @@ export function loadConfig(): GatewayConfig {
       "recordings/{externalId}/{sessionId}-{time}.mp4",
     ),
     defaultTokenTtlSeconds: Number(env("TOKEN_TTL_SECONDS", "600")),
+    webhookForwardUrls: env("WEBHOOK_FORWARD_URLS")
+      .split(",")
+      .map((u) => u.trim())
+      .filter(Boolean),
   };
 }

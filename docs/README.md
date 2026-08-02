@@ -25,3 +25,4 @@ Self-hosted, app-agnostic live/realtime media (LiveKit + Egress + HTTP Gateway).
 | [decisions/ADR-006-echo-recording-storage-aws.md](decisions/ADR-006-echo-recording-storage-aws.md) | Echo on AWS S3 (initial) |
 | [decisions/ADR-007-softqraft-open-source-identity.md](decisions/ADR-007-softqraft-open-source-identity.md) | SoftQraft open-source identity |
 | [operations/phase-1-runbook.md](operations/phase-1-runbook.md) | Phase 1 bring-up and smoke |
+| [operations/phase-2-dual-run.md](operations/phase-2-dual-run.md) | Clatters dual-run / webhook fan-out |

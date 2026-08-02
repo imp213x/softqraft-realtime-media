@@ -4,6 +4,8 @@ import { randomUUID } from "node:crypto";
 declare module "fastify" {
   interface FastifyRequest {
     requestId: string;
+    /** Raw body string for LiveKit webhook verification */
+    rawBody?: string;
   }
 }
 

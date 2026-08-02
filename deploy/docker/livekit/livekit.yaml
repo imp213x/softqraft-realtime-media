@@ -25,6 +25,12 @@ keys:
 logging:
   level: info
 
+# Webhooks → SoftQraft Gateway (verify + optional fan-out to consumer apps)
+webhook:
+  api_key: softqraft_dev_key
+  urls:
+    - http://gateway:8080/v1/webhooks/livekit
+
 # Enable TURN in production with a public domain and TLS certs.
 # Local Compose smoke tests work without TURN for same-network clients.
 turn:

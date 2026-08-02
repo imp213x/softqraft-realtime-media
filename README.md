@@ -89,7 +89,8 @@ pnpm --filter @softqraft/shared build
 pnpm dev:gateway
 ```
 
-Full operator steps: [docs/operations/phase-1-runbook.md](docs/operations/phase-1-runbook.md)
+Full operator steps: [docs/operations/phase-1-runbook.md](docs/operations/phase-1-runbook.md)  
+Dual-run / Clatters: [docs/operations/phase-2-dual-run.md](docs/operations/phase-2-dual-run.md)
 
 ---
 

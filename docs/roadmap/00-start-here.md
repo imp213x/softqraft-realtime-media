@@ -50,26 +50,25 @@ Self-host **LiveKit + Redis + Egress** + Gateway:
 
 **Success:** Operator runs smoke with Docker Desktop up; optional publish → MP4 in bucket.
 
-### Step 2 — Agnostic Gateway productization
+### Step 2 — Dual-run readiness ✅ (in progress / implemented)
 
-- Caller-supplied `roomName` / `externalId`  
-- Token minting with role templates  
-- Egress start/stop/status  
-- Profile flags  
-- Generic webhook fan-out  
+- LiveKit → Gateway webhook verify (`POST /v1/webhooks/livekit`)  
+- Optional `WEBHOOK_FORWARD_URLS` fan-out to consumer apps (Clatters Echo)  
+- Clatters dual-run env + role mapping examples  
+- Runbook: [../operations/phase-2-dual-run.md](../operations/phase-2-dual-run.md)  
 
 ### Step 3 — HLS / CDN profile
 
 Optional mass-audience path; does not break file-recording consumers.
 
-### Step 4 — Consumer adapters
+### Step 4 — Consumer cutover
 
-- Clatters: env swap + optional thin adapter for path templates / dual-run  
-- Generic backend example  
+- Clatters staging dual-run → % production  
+- Keep Cloud rollback window  
 
 ### Step 5 — Harden
 
-Multi-node, quotas, multi-tenant keys, load tests.
+Multi-node, quotas, multi-tenant keys, load tests, TURN for mobile NAT.
 
 ---
 
