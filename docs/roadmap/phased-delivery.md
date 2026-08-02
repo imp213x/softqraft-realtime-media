@@ -80,9 +80,10 @@ Deliverables:
 
 Remaining Phase 3:
 
-- Audience player contract (hls.js) in examples  
-- Load-test plan toward 10k passive viewers  
-- Production origin + CDN cutover for a real show  
+- [x] Audience player (hls.js) in `examples/local-live-test`  
+- [x] Load-test plan doc ([load-test-plan-10k.md](../operations/load-test-plan-10k.md))  
+- [ ] Execute L1–L3 load tests on real CDN/origin  
+- [ ] Production origin + CDN cutover for a real show  
 
 ---
 

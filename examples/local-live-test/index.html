@@ -36,7 +36,7 @@
       }
       main {
         display: grid;
-        grid-template-columns: 320px 1fr;
+        grid-template-columns: 340px 1fr;
         min-height: calc(100vh - 58px);
       }
       @media (max-width: 900px) {
@@ -118,17 +118,32 @@
         padding: 0.2rem 0.45rem;
         border-radius: 6px;
         font-size: 0.75rem;
+        z-index: 2;
       }
       #log {
-        height: 140px;
+        height: 120px;
         resize: vertical;
         font-family: ui-monospace, Consolas, monospace;
         font-size: 0.75rem;
       }
-      .row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0.5rem;
+      .hint {
+        margin: 0;
+        font-size: 0.75rem;
+        color: #9fb3d1;
+        line-height: 1.4;
+      }
+      .hint a {
+        color: #93c5fd;
+      }
+      .section-title {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #64748b;
+        margin: 0.25rem 0 0;
+      }
+      #hlsUrl {
+        font-size: 0.7rem;
       }
     </style>
   </head>
@@ -137,6 +152,8 @@
       <h1>SoftQraft Local Live Test</h1>
       <span class="badge" id="statusBadge">disconnected</span>
       <span class="badge" id="sessionBadge">no session</span>
+      <span class="badge" id="echoBadge">echo: off</span>
+      <span class="badge" id="hlsBadge">hls: off</span>
     </header>
     <main>
       <aside>
@@ -152,7 +169,8 @@
           <label>Role</label>
           <select id="role">
             <option value="host" selected>host (publish)</option>
-            <option value="realtime_viewer">realtime_viewer</option>
+            <option value="realtime_viewer">realtime_viewer (WebRTC)</option>
+            <option value="hls_viewer">hls_viewer (HLS audience)</option>
             <option value="guest">guest</option>
           </select>
         </div>
@@ -166,23 +184,37 @@
           <label>Existing session id</label>
           <input id="sessionId" placeholder="sess_…" />
         </div>
-        <label style="display:flex;align-items:center;gap:0.5rem;color:#e8ecf4">
-          <input type="checkbox" id="autoEcho" checked style="width:auto" />
-          Auto-start Echo to local MinIO after publish
+
+        <p class="section-title">Echo (MP4 → MinIO)</p>
+        <label style="display: flex; align-items: center; gap: 0.5rem; color: #e8ecf4">
+          <input type="checkbox" id="autoEcho" checked style="width: auto" />
+          Auto-start Echo after publish
         </label>
-        <button id="btnEgress" class="secondary" disabled>Start Echo egress (MP4 → MinIO)</button>
+        <button id="btnEgress" class="secondary" disabled>Start Echo egress</button>
         <button id="btnStopEgress" class="secondary" disabled>Stop Echo (finalize MP4)</button>
+
+        <p class="section-title">HLS audience (market-grade 3b)</p>
+        <label style="display: flex; align-items: center; gap: 0.5rem; color: #e8ecf4">
+          <input type="checkbox" id="autoHls" style="width: auto" />
+          Auto-start HLS after publish
+        </label>
+        <button id="btnHls" class="secondary" disabled>Start HLS egress</button>
+        <button id="btnStopHls" class="secondary" disabled>Stop HLS</button>
+        <button id="btnPlayHls" class="secondary" disabled>Play HLS URL</button>
+        <div>
+          <label>HLS playlist URL</label>
+          <input id="hlsUrl" placeholder="http://localhost:9000/sqrm-recordings/hls/…" readonly />
+        </div>
+
         <button id="btnLeave" class="danger" disabled>Leave / end</button>
-        <p style="margin:0;font-size:0.75rem;color:#9fb3d1;line-height:1.4">
-          Local storage: MinIO bucket <code>sqrm-recordings</code><br />
-          Console:
-          <a href="http://localhost:9001" target="_blank" rel="noreferrer" style="color:#93c5fd"
-            >http://localhost:9001</a
-          >
+        <p class="hint">
+          Local MinIO:
+          <a href="http://localhost:9001" target="_blank" rel="noreferrer">console :9001</a>
           (softqraft / softqraftsecret)<br />
-          Path: <code>recordings/local-dev/…</code>
+          Echo: <code>recordings/local-dev/…</code><br />
+          HLS: <code>hls/local-dev/{sessionId}/live.m3u8</code><br />
+          TURN: tokens include <code>iceServers</code> when Gateway TURN_* is set.
         </p>
-        <span class="badge" id="echoBadge">echo: off</span>
         <div>
           <label>Log</label>
           <textarea id="log" readonly></textarea>
@@ -198,6 +230,7 @@
         Track,
         createLocalTracks,
       } from "https://cdn.jsdelivr.net/npm/livekit-client@2.9.1/+esm";
+      import Hls from "https://cdn.jsdelivr.net/npm/hls.js@1.5.17/+esm";
 
       const el = (id) => document.getElementById(id);
       const logEl = el("log");
@@ -206,7 +239,10 @@
       let room = null;
       let sessionId = null;
       let realtimeUrl = null;
+      let iceServers = [];
       let egressId = null;
+      let hlsEgressId = null;
+      let hlsPlayer = null;
 
       function log(msg) {
         const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
@@ -222,13 +258,21 @@
         el("echoBadge").textContent = text;
       }
 
+      function setHls(text) {
+        el("hlsBadge").textContent = text;
+      }
+
       function setSession(id) {
         sessionId = id || null;
         el("sessionBadge").textContent = id ? id : "no session";
         el("sessionId").value = id || "";
-        el("btnEgress").disabled = !id || !room;
+        const live = Boolean(id);
+        el("btnEgress").disabled = !live || !room;
+        el("btnHls").disabled = !live || !room;
         el("btnStopEgress").disabled = !egressId;
-        el("btnLeave").disabled = !room && !id;
+        el("btnStopHls").disabled = !hlsEgressId;
+        el("btnPlayHls").disabled = !el("hlsUrl").value;
+        el("btnLeave").disabled = !room && !id && !el("hlsUrl").value;
       }
 
       async function api(path, { method = "GET", body } = {}) {
@@ -239,7 +283,11 @@
             Authorization: `Bearer ${el("apiKey").value}`,
             "Content-Type": "application/json",
           },
-          body: body ? JSON.stringify(body) : method === "POST" ? "{}" : undefined,
+          body: body
+            ? JSON.stringify(body)
+            : method === "POST"
+              ? "{}"
+              : undefined,
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -249,7 +297,8 @@
       }
 
       function attachTrack(track, identity, kind) {
-        if (track.kind !== Track.Kind.Video && track.kind !== Track.Kind.Audio) return;
+        if (track.kind !== Track.Kind.Video && track.kind !== Track.Kind.Audio)
+          return;
         const id = `tile-${identity}-${track.sid || track.kind}`;
         let tile = document.getElementById(id);
         if (!tile) {
@@ -281,10 +330,27 @@
       }
 
       function clearStage() {
+        if (hlsPlayer) {
+          try {
+            hlsPlayer.destroy();
+          } catch {
+            /* ignore */
+          }
+          hlsPlayer = null;
+        }
         stage.innerHTML = "";
       }
 
-      async function connectWithToken(token, url) {
+      function normalizeIceServers(raw) {
+        if (!Array.isArray(raw) || !raw.length) return undefined;
+        return raw.map((s) => ({
+          urls: s.urls,
+          username: s.username,
+          credential: s.credential,
+        }));
+      }
+
+      async function connectWithToken(token, url, servers) {
         if (room) {
           await room.disconnect();
           room = null;
@@ -297,7 +363,7 @@
             log(`subscribed ${participant.identity} ${track.kind}`);
           })
           .on(RoomEvent.TrackUnsubscribed, (track) => {
-            track.detach().forEach((el) => el.remove());
+            track.detach().forEach((n) => n.remove());
           })
           .on(RoomEvent.Disconnected, () => {
             setStatus("disconnected");
@@ -305,9 +371,16 @@
           });
 
         setStatus("connecting…");
-        await room.connect(url, token);
+        const ice = normalizeIceServers(servers ?? iceServers);
+        const opts = ice?.length ? { rtcConfig: { iceServers: ice } } : {};
+        if (ice?.length) {
+          log(`using ${ice.length} iceServer group(s) from Gateway (TURN/STUN)`);
+        }
+        await room.connect(url, token, opts);
         setStatus(`connected · ${room.name}`);
-        log(`connected to room ${room.name} as ${room.localParticipant.identity}`);
+        log(
+          `connected to room ${room.name} as ${room.localParticipant.identity}`,
+        );
 
         const role = el("role").value;
         if (role === "host" || role === "guest" || role === "cohost") {
@@ -317,15 +390,15 @@
             attachTrack(track, room.localParticipant.identity, "local");
           }
           log("published camera + microphone");
-          // Wait briefly so Egress/Chrome sees tracks
-          if (el("autoEcho").checked && sessionId) {
-            // Give WebRTC + Egress Chrome time before room composite
+          if (sessionId) {
             await new Promise((r) => setTimeout(r, 4000));
-            await startEgress({ quiet: true });
+            if (el("autoEcho").checked) await startEgress({ quiet: true });
+            if (el("autoHls").checked) await startHls({ quiet: true });
           }
         }
 
         el("btnEgress").disabled = !sessionId;
+        el("btnHls").disabled = !sessionId;
         el("btnLeave").disabled = false;
       }
 
@@ -333,33 +406,37 @@
         try {
           el("btnGoLive").disabled = true;
           egressId = null;
+          hlsEgressId = null;
+          el("hlsUrl").value = "";
           setEcho("echo: off");
+          setHls("hls: off");
           const session = await api("/v1/sessions", {
             method: "POST",
             body: {
               idempotencyKey: `local-live-${Date.now()}`,
               externalId: "local-dev",
-              profile: "live_plus_recording",
-              audience: { mode: "realtime", visibility: "public" },
+              profile: "hybrid_live",
+              audience: { mode: "hybrid", visibility: "public" },
               metadata: { source: "local-live-test", storage: "minio-local" },
             },
           });
           setSession(session.sessionId);
           realtimeUrl = session.realtime?.url;
           log(`session ${session.sessionId} room=${session.roomName}`);
-          log("storage: local MinIO bucket sqrm-recordings");
+          log("profile=hybrid_live audience=hybrid (WebRTC stage + HLS path)");
 
           const minted = await api(`/v1/sessions/${session.sessionId}/tokens`, {
             method: "POST",
             body: {
               identity: el("identity").value || "local-host",
               name: el("identity").value || "local-host",
-              role: el("role").value,
+              role: el("role").value === "hls_viewer" ? "host" : el("role").value,
               ttlSeconds: 3600,
             },
           });
           realtimeUrl = minted.realtimeUrl || realtimeUrl;
-          await connectWithToken(minted.token, realtimeUrl);
+          iceServers = minted.iceServers || [];
+          await connectWithToken(minted.token, realtimeUrl, iceServers);
         } catch (err) {
           log(`error: ${err.message || err}`);
           setStatus("error");
@@ -373,6 +450,23 @@
         try {
           const id = el("sessionId").value.trim();
           if (!id) throw new Error("Enter a session id");
+
+          // HLS-only audience path (no WebRTC)
+          if (el("role").value === "hls_viewer") {
+            setSession(id);
+            const pb = await api(`/v1/sessions/${id}/playback`);
+            const url = pb.hlsUrl || el("hlsUrl").value;
+            if (!url) {
+              throw new Error(
+                "No hlsUrl yet — host must Start HLS egress first",
+              );
+            }
+            el("hlsUrl").value = url;
+            el("btnPlayHls").disabled = false;
+            await playHls(url);
+            return;
+          }
+
           const session = await api(`/v1/sessions/${id}`);
           setSession(session.sessionId);
           realtimeUrl = session.realtime?.url;
@@ -384,7 +478,12 @@
               ttlSeconds: 3600,
             },
           });
-          await connectWithToken(minted.token, minted.realtimeUrl || realtimeUrl);
+          iceServers = minted.iceServers || [];
+          await connectWithToken(
+            minted.token,
+            minted.realtimeUrl || realtimeUrl,
+            iceServers,
+          );
         } catch (err) {
           log(`error: ${err.message || err}`);
           alert(err.message || String(err));
@@ -407,11 +506,12 @@
           egressId = job.egressId;
           el("btnStopEgress").disabled = false;
           setEcho(`echo: ${job.status || "active"} · ${egressId}`);
-          log(`egress started ${egressId} → MinIO sqrm-recordings/recordings/local-dev/`);
-          log("Keep publishing 15–30s, then Stop Echo (or Leave) to finalize MP4.");
+          log(
+            `Echo started ${egressId} → MinIO recordings/local-dev/…`,
+          );
           if (!quiet) {
             alert(
-              `Echo started: ${egressId}\n\nKeep camera on 15–30s, then click Stop Echo.\nOpen MinIO: http://localhost:9001\nbucket: sqrm-recordings`,
+              `Echo started: ${egressId}\nKeep camera 15–30s, then Stop Echo.\nMinIO: http://localhost:9001`,
             );
           }
         } catch (err) {
@@ -421,6 +521,89 @@
         }
       }
 
+      async function startHls({ quiet = false } = {}) {
+        if (!sessionId) return;
+        try {
+          setHls("hls: starting…");
+          const job = await api(`/v1/sessions/${sessionId}/egress`, {
+            method: "POST",
+            body: {
+              type: "room_composite_hls",
+              options: {
+                keyTemplate: "hls/{externalId}/{sessionId}",
+                segmentDurationSeconds: 2,
+                livePlaylistName: "live.m3u8",
+              },
+            },
+          });
+          hlsEgressId = job.egressId;
+          const url = job.playback?.hlsUrl || "";
+          el("hlsUrl").value = url;
+          el("btnStopHls").disabled = false;
+          el("btnPlayHls").disabled = !url;
+          setHls(`hls: ${job.status || "active"} · ${hlsEgressId}`);
+          log(`HLS egress ${hlsEgressId}`);
+          if (url) log(`playback.hlsUrl = ${url}`);
+          else
+            log(
+              "No hlsUrl — set HLS_PUBLIC_BASE_URL on Gateway (see media.env.example)",
+            );
+          if (!quiet && url) {
+            alert(
+              `HLS started.\n${url}\n\nOpen second tab: role=hls_viewer, paste session id, Join.\nOr click Play HLS URL here.`,
+            );
+          }
+        } catch (err) {
+          setHls("hls: error");
+          log(`hls error: ${err.message || err}`);
+          if (!quiet) alert(err.message || String(err));
+        }
+      }
+
+      async function playHls(url) {
+        const src = url || el("hlsUrl").value;
+        if (!src) throw new Error("No HLS URL");
+        clearStage();
+        const tile = document.createElement("div");
+        tile.className = "tile";
+        tile.id = "tile-hls-audience";
+        const tag = document.createElement("div");
+        tag.className = "tag";
+        tag.textContent = "HLS audience";
+        const video = document.createElement("video");
+        video.controls = true;
+        video.autoplay = true;
+        video.playsInline = true;
+        video.muted = true;
+        tile.appendChild(video);
+        tile.appendChild(tag);
+        stage.appendChild(tile);
+
+        if (Hls.isSupported()) {
+          hlsPlayer = new Hls({
+            lowLatencyMode: true,
+            liveSyncDurationCount: 3,
+          });
+          hlsPlayer.loadSource(src);
+          hlsPlayer.attachMedia(video);
+          hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
+            video.play().catch(() => {});
+            log("HLS manifest parsed — playing");
+          });
+          hlsPlayer.on(Hls.Events.ERROR, (_e, data) => {
+            log(`hls.js error: ${data?.type} ${data?.details || ""}`);
+          });
+        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+          video.src = src;
+          await video.play().catch(() => {});
+          log("native HLS play");
+        } else {
+          throw new Error("HLS not supported in this browser");
+        }
+        setStatus("hls playing");
+        el("btnLeave").disabled = false;
+      }
+
       async function waitForEgressTerminal(id, { timeoutMs = 120000 } = {}) {
         const started = Date.now();
         let last = "stopping";
@@ -428,10 +611,7 @@
           try {
             const job = await api(`/v1/egress/${id}`);
             last = job.status || last;
-            setEcho(`echo: ${last} · ${id}`);
-            if (last === "complete" || last === "failed") {
-              return job;
-            }
+            if (last === "complete" || last === "failed") return job;
           } catch (err) {
             log(`egress poll: ${err.message || err}`);
           }
@@ -440,39 +620,33 @@
         return { egressId: id, status: last, error: "poll_timeout" };
       }
 
-      async function stopEgress() {
-        if (!egressId) return;
-        const id = egressId;
+      async function stopEgressJob(id, label) {
+        if (!id) return;
         try {
-          setEcho("echo: stopping…");
-          log(`stopping egress ${id} (finalize can take 10–30s)…`);
+          log(`stopping ${label} ${id}…`);
           try {
-            await api(`/v1/egress/${id}/stop`, {
-              method: "POST",
-              body: {},
-            });
+            await api(`/v1/egress/${id}/stop`, { method: "POST", body: {} });
           } catch (err) {
-            // Already aborted/complete is OK — still poll
             log(`stop call: ${err.message || err}`);
           }
           const job = await waitForEgressTerminal(id);
-          const status = job.status || "unknown";
-          setEcho(`echo: ${status} · ${id}`);
-          log(`egress ${id} final status=${status}`);
-          if (status === "complete") {
-            log(
-              "Recording ready → MinIO sqrm-recordings / recordings/local-dev/",
-            );
-            log("Open http://localhost:9001 (softqraft / softqraftsecret)");
-          } else if (job.error) {
-            log(`egress error detail: ${job.error}`);
-          }
-          el("btnStopEgress").disabled = true;
+          log(`${label} ${id} final=${job.status || "unknown"}`);
           return job;
         } catch (err) {
-          log(`stop egress error: ${err.message || err}`);
-          alert(err.message || String(err));
+          log(`stop ${label} error: ${err.message || err}`);
         }
+      }
+
+      async function stopEgress() {
+        const job = await stopEgressJob(egressId, "echo");
+        if (job) setEcho(`echo: ${job.status} · ${egressId}`);
+        el("btnStopEgress").disabled = true;
+      }
+
+      async function stopHls() {
+        const job = await stopEgressJob(hlsEgressId, "hls");
+        if (job) setHls(`hls: ${job.status} · ${hlsEgressId}`);
+        el("btnStopHls").disabled = true;
       }
 
       async function leave() {
@@ -480,10 +654,16 @@
           if (egressId) {
             try {
               await stopEgress();
-              // Give Egress a moment to flush the file to MinIO
-              await new Promise((r) => setTimeout(r, 2000));
+              await new Promise((r) => setTimeout(r, 1500));
             } catch {
-              /* continue teardown */
+              /* continue */
+            }
+          }
+          if (hlsEgressId) {
+            try {
+              await stopHls();
+            } catch {
+              /* continue */
             }
           }
           if (room) {
@@ -491,7 +671,10 @@
             room = null;
           }
           if (sessionId && el("role").value === "host") {
-            await api(`/v1/sessions/${sessionId}/end`, { method: "POST", body: {} });
+            await api(`/v1/sessions/${sessionId}/end`, {
+              method: "POST",
+              body: {},
+            });
             log(`ended session ${sessionId}`);
           }
         } catch (err) {
@@ -499,33 +682,45 @@
         } finally {
           clearStage();
           egressId = null;
+          hlsEgressId = null;
+          el("hlsUrl").value = "";
           setEcho("echo: off");
+          setHls("hls: off");
           setSession(null);
           setStatus("disconnected");
           el("btnLeave").disabled = true;
           el("btnEgress").disabled = true;
+          el("btnHls").disabled = true;
           el("btnStopEgress").disabled = true;
+          el("btnStopHls").disabled = true;
+          el("btnPlayHls").disabled = true;
         }
       }
 
       el("btnGoLive").onclick = goLive;
       el("btnJoin").onclick = joinExisting;
       el("btnEgress").onclick = () => startEgress({ quiet: false });
+      el("btnHls").onclick = () => startHls({ quiet: false });
       el("btnStopEgress").onclick = stopEgress;
+      el("btnStopHls").onclick = stopHls;
+      el("btnPlayHls").onclick = () =>
+        playHls().catch((err) => {
+          log(err.message || err);
+          alert(err.message || String(err));
+        });
       el("btnLeave").onclick = leave;
 
-      // Query params from start script
       const params = new URLSearchParams(location.search);
       if (params.get("gateway")) el("gatewayUrl").value = params.get("gateway");
       if (params.get("apiKey")) el("apiKey").value = params.get("apiKey");
       if (params.get("role")) el("role").value = params.get("role");
       if (params.get("identity")) el("identity").value = params.get("identity");
       if (params.get("sessionId")) el("sessionId").value = params.get("sessionId");
-      if (params.get("autostart") === "1") {
-        goLive();
-      }
+      if (params.get("autoHls") === "1") el("autoHls").checked = true;
+      if (params.get("autostart") === "1") goLive();
 
-      log("Ready. Click Go live (allow camera/mic).");
+      log("Ready. Host: Go live. Viewer WebRTC: role=realtime_viewer + session id.");
+      log("HLS audience: host Start HLS → second tab role=hls_viewer + Join.");
     </script>
   </body>
 </html>

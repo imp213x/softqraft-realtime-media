@@ -16,6 +16,8 @@
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
-    "smoke:phase1": "powershell -ExecutionPolicy Bypass -File ./scripts/smoke-phase1.ps1"
+    "smoke:phase1": "powershell -ExecutionPolicy Bypass -File ./scripts/smoke-phase1.ps1",
+    "smoke:phase3": "powershell -ExecutionPolicy Bypass -File ./scripts/smoke-phase3.ps1",
+    "local:live": "powershell -ExecutionPolicy Bypass -File ./scripts/start-local-live.ps1"
   }
 }

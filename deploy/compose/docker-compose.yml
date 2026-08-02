@@ -105,7 +105,7 @@ services:
     volumes:
       - minio_data:/data
 
-  # Create default recording bucket on first boot
+  # Create default recording bucket; public-read for local HLS players (lab only)
   minio-init:
     image: minio/mc:latest
     depends_on:
@@ -114,7 +114,10 @@ services:
       /bin/sh -c "
       sleep 5;
       mc alias set local http://minio:9000 $${MINIO_ROOT_USER:-softqraft} $${MINIO_ROOT_PASSWORD:-softqraftsecret};
-      mc mb -p local/$${S3_BUCKET_NAME:-sqrm-recordings} || true;
+      BUCKET=$${S3_BUCKET_NAME:-sqrm-recordings};
+      mc mb -p local/$$BUCKET || true;
+      # Lab-only: allow anonymous GET so browser hls.js can fetch playlists/segments
+      mc anonymous set download local/$$BUCKET || true;
       exit 0;
       "
     environment:
@@ -180,9 +183,10 @@ services:
       # Multi-tenant: tenantId:apiKey:maxSessions:maxEgress (comma-separated)
       # Example: clatters:dev-local-key:50:10,demo:demo-key:20:5
       GATEWAY_TENANTS: ${GATEWAY_TENANTS:-}
-      # TURN iceServers returned on participant tokens (coturn profiles turn / turn-bridge)
+      # TURN iceServers for *browsers* — must be a host the client can reach
+      # (LAN IP or 127.0.0.1). start-local-live.ps1 sets TURN_HOST from LAN IP.
       TURN_ENABLED: ${TURN_ENABLED:-true}
-      TURN_HOST: ${TURN_HOST:-host.docker.internal}
+      TURN_HOST: ${TURN_HOST:-127.0.0.1}
       TURN_PORT: ${TURN_PORT:-3478}
       TURN_USERNAME: ${TURN_USERNAME:-softqraft}
       TURN_PASSWORD: ${TURN_PASSWORD:-softqraftturn}

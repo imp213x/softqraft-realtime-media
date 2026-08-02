@@ -28,7 +28,9 @@ Self-hosted, app-agnostic live/realtime media (LiveKit + Egress + HTTP Gateway).
 | [operations/phase-2-dual-run.md](operations/phase-2-dual-run.md) | Clatters dual-run / webhook fan-out |
 | [operations/cost-improvement-analysis.md](operations/cost-improvement-analysis.md) | Cost: Cloud vs SoftQraft |
 | [operations/phase-2-checklist.md](operations/phase-2-checklist.md) | Phase 2 close-out checklist |
+| [operations/local-live-test.md](operations/local-live-test.md) | Local UI + commands (WebRTC, Echo, HLS, TURN) |
 | [operations/turn-hls-cdn.md](operations/turn-hls-cdn.md) | Market-grade TURN / HLS / CDN / tenants |
+| [operations/load-test-plan-10k.md](operations/load-test-plan-10k.md) | Phase 3e load-test plan |
 | [architecture/market-grade-product.md](architecture/market-grade-product.md) | Product stack others would pay for |
 | [decisions/ADR-008-market-grade-product-stack.md](decisions/ADR-008-market-grade-product-stack.md) | ADR: no mandatory SaaS for core layers |
 | [roadmap/phased-delivery.md](roadmap/phased-delivery.md) | Phase status matrix |

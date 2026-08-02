@@ -205,3 +205,23 @@ docker compose --profile turn-bridge up -d
 Copy-Item ..\env\media.env.example .env
 # edit TURN_*, GATEWAY_TENANTS, HLS_*, CDN_*
 ```
+
+## Local test commands (canonical)
+
+```powershell
+cd C:\Dev\live-streaming-platform
+
+# Full UI: WebRTC + Echo + optional HLS/TURN
+.\scripts\start-local-live.ps1 -SyncNodeIp -WithTurn -RebuildGateway
+
+# API only
+.\scripts\smoke-phase1.ps1
+.\scripts\smoke-phase3.ps1
+.\scripts\smoke-phase3.ps1 -OtherApiKey demo-key   # if GATEWAY_TENANTS set
+
+# Recordings
+.\scripts\list-local-recordings.ps1
+```
+
+Step-by-step browser flows: [local-live-test.md](local-live-test.md)  
+10k plan: [load-test-plan-10k.md](load-test-plan-10k.md)
