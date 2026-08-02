@@ -1,6 +1,6 @@
 import { AccessToken, type VideoGrant } from "livekit-server-sdk";
 import type { ParticipantRole } from "@softqraft/shared";
-import type { GatewayConfig } from "../../config.js";
+import type { GatewayConfig, IceServerConfig } from "../../config.js";
 
 export interface MintTokenInput {
   identity: string;
@@ -17,6 +17,11 @@ export interface MintedToken {
   role: ParticipantRole;
   expiresAt: string;
   realtimeUrl: string;
+  /**
+   * ICE servers (STUN/TURN) for client Room.connect rtcConfig.
+   * Empty when TURN is not configured — clients may still use browser defaults.
+   */
+  iceServers: IceServerConfig[];
 }
 
 function grantForRole(role: ParticipantRole): VideoGrant {
@@ -91,5 +96,6 @@ export async function mintParticipantToken(
     role: input.role,
     expiresAt,
     realtimeUrl: config.realtimeUrl,
+    iceServers: config.iceServers,
   };
 }

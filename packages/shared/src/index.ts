@@ -51,6 +51,8 @@ export const ERROR_CODES = {
   VALIDATION: "validation_error",
   CONFLICT: "conflict",
   DEPENDENCY: "dependency_unavailable",
+  QUOTA_EXCEEDED: "quota_exceeded",
+  FORBIDDEN: "forbidden",
   INTERNAL: "internal_error",
 } as const;
 

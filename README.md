@@ -20,11 +20,11 @@ Replace managed LiveKit Cloud for realtime cost control. Keep client LiveKit SDK
 | 0 Foundation | ✅ |
 | **1 Media plane parity** | **✅ Complete** (local live + Echo to MinIO verified) |
 | **2 Gateway + dual-run** | **🔄 In progress** — platform ready; Clatters staging dual-run next |
-| 3 HLS/CDN (10k audience) | ⏳ |
+| **3 Market-grade audience** | **🔄 3a–d done** — coturn, HLS egress, multi-tenant quotas, CDN templates |
 | 4 Production cutover | ⏳ |
 | 5 Harden | ⏳ |
 
-See [docs/roadmap/phased-delivery.md](docs/roadmap/phased-delivery.md) and [docs/operations/phase-2-checklist.md](docs/operations/phase-2-checklist.md).
+See [docs/roadmap/phased-delivery.md](docs/roadmap/phased-delivery.md), [docs/architecture/market-grade-product.md](docs/architecture/market-grade-product.md), and [docs/operations/turn-hls-cdn.md](docs/operations/turn-hls-cdn.md).
 
 ---
 
@@ -61,7 +61,7 @@ See [docs/roadmap/phased-delivery.md](docs/roadmap/phased-delivery.md) and [docs
 |---------|--------|
 | WebRTC realtime | Self-hosted SFU (not LiveKit Cloud; not AWS as primary media egress) |
 | Recording / Echo MP4 | **Local:** MinIO · **Clatters cutover:** AWS S3 (ADR-006) |
-| Future HLS audience | CDN + S3-compatible segment storage (pluggable) |
+| HLS audience | Egress segments → object storage; CDN (Cloudflare/Bunny) optional |
 
 ---
 

@@ -4,9 +4,10 @@ import { randomUUID } from "node:crypto";
 import type { GatewayConfig } from "../../config.js";
 import type { LiveKitClients } from "../../providers/livekit/client.js";
 import { requireServiceAuth, HttpError } from "../../lib/auth.js";
+import type { QuotaTracker } from "../../lib/quotas.js";
 import { sendError } from "../../lib/errors.js";
 import { ERROR_CODES } from "@softqraft/shared";
-import { SessionStore } from "./store.js";
+import { SessionStore, assertSessionAccess } from "./store.js";
 import { toPublicSession } from "./types.js";
 import { mintParticipantToken } from "../../providers/livekit/tokens.js";
 
@@ -62,18 +63,25 @@ export async function registerSessionRoutes(
   config: GatewayConfig,
   clients: LiveKitClients,
   store: SessionStore,
+  quotas: QuotaTracker,
 ): Promise<void> {
   app.post("/v1/sessions", async (req, reply) => {
     try {
-      requireServiceAuth(req, config);
+      const auth = requireServiceAuth(req, config);
       const body = createSessionBody.parse(req.body ?? {});
+      const tenantId = auth.tenant?.tenantId ?? null;
 
       if (body.idempotencyKey) {
-        const existing = store.getByIdempotencyKey(body.idempotencyKey);
+        const existing = store.getByIdempotencyKey(
+          body.idempotencyKey,
+          tenantId,
+        );
         if (existing) {
           return reply.status(200).send(toPublicSession(existing));
         }
       }
+
+      quotas.assertCanCreateSession(auth.tenant);
 
       const sessionId = `sess_${randomUUID().replace(/-/g, "")}`;
       const roomName = body.roomName?.trim() || sessionId;
@@ -87,6 +95,7 @@ export async function registerSessionRoutes(
           maxParticipants,
           metadata: JSON.stringify({
             sessionId,
+            tenantId,
             externalId: body.externalId ?? null,
             ...(body.metadata ?? {}),
           }),
@@ -105,6 +114,7 @@ export async function registerSessionRoutes(
 
       const session = store.create({
         sessionId,
+        tenantId,
         externalId: body.externalId ?? null,
         roomName,
         status: "ready",
@@ -121,6 +131,8 @@ export async function registerSessionRoutes(
         endedAt: null,
       });
 
+      quotas.onSessionCreated(tenantId);
+
       return reply.status(201).send(toPublicSession(session));
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -136,10 +148,16 @@ export async function registerSessionRoutes(
 
   app.get("/v1/sessions", async (req, reply) => {
     try {
-      requireServiceAuth(req, config);
+      const auth = requireServiceAuth(req, config);
       const q = req.query as { status?: string; limit?: string };
       const limit = Math.min(100, Math.max(1, Number(q.limit ?? 20) || 20));
-      const items = store.list(q.status, limit).map(toPublicSession);
+      const tenantId = auth.tenant?.tenantId ?? null;
+      // When multi-tenant is active, scope list to caller's tenant
+      const scopeTenant =
+        config.tenantsByKey.size > 0 ? tenantId : undefined;
+      const items = store
+        .list(q.status, limit, scopeTenant)
+        .map(toPublicSession);
       return reply.send({ items });
     } catch (err) {
       return sendError(req, reply, err);
@@ -148,10 +166,11 @@ export async function registerSessionRoutes(
 
   app.get("/v1/sessions/:sessionId", async (req, reply) => {
     try {
-      requireServiceAuth(req, config);
+      const auth = requireServiceAuth(req, config);
       const { sessionId } = req.params as { sessionId: string };
       const session = store.get(sessionId);
-      if (!session) {
+      const tenantId = auth.tenant?.tenantId ?? null;
+      if (!assertSessionAccess(session, tenantId)) {
         throw new HttpError(404, ERROR_CODES.NOT_FOUND, "Session not found");
       }
       return reply.send(toPublicSession(session));
@@ -162,10 +181,11 @@ export async function registerSessionRoutes(
 
   app.post("/v1/sessions/:sessionId/end", async (req, reply) => {
     try {
-      requireServiceAuth(req, config);
+      const auth = requireServiceAuth(req, config);
       const { sessionId } = req.params as { sessionId: string };
       const session = store.get(sessionId);
-      if (!session) {
+      const tenantId = auth.tenant?.tenantId ?? null;
+      if (!assertSessionAccess(session, tenantId)) {
         throw new HttpError(404, ERROR_CODES.NOT_FOUND, "Session not found");
       }
 
@@ -192,6 +212,9 @@ export async function registerSessionRoutes(
       }
 
       const ended = store.end(sessionId)!;
+      if (session.status !== "ended") {
+        quotas.onSessionEnded(session.tenantId);
+      }
       return reply.send(toPublicSession(ended));
     } catch (err) {
       return sendError(req, reply, err);
@@ -200,10 +223,11 @@ export async function registerSessionRoutes(
 
   app.post("/v1/sessions/:sessionId/tokens", async (req, reply) => {
     try {
-      requireServiceAuth(req, config);
+      const auth = requireServiceAuth(req, config);
       const { sessionId } = req.params as { sessionId: string };
       const session = store.get(sessionId);
-      if (!session || session.status === "ended") {
+      const tenantId = auth.tenant?.tenantId ?? null;
+      if (!assertSessionAccess(session, tenantId) || session.status === "ended") {
         throw new HttpError(404, ERROR_CODES.NOT_FOUND, "Session not found");
       }
       const body = createTokenBody.parse(req.body ?? {});
@@ -236,10 +260,11 @@ export async function registerSessionRoutes(
 
   app.get("/v1/sessions/:sessionId/playback", async (req, reply) => {
     try {
-      requireServiceAuth(req, config);
+      const auth = requireServiceAuth(req, config);
       const { sessionId } = req.params as { sessionId: string };
       const session = store.get(sessionId);
-      if (!session) {
+      const tenantId = auth.tenant?.tenantId ?? null;
+      if (!assertSessionAccess(session, tenantId)) {
         throw new HttpError(404, ERROR_CODES.NOT_FOUND, "Session not found");
       }
       return reply.send({

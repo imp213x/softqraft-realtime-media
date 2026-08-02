@@ -5,8 +5,9 @@
 #   copy ..\env\media.env.example .env   # PowerShell: Copy-Item
 #   docker compose up -d
 #
-# Stack: Redis + LiveKit + Egress + MinIO (local S3 for recording smoke tests)
-# Production Echo: point Egress/Gateway at AWS S3 (ADR-006); MinIO is local-only.
+# Stack: Redis + LiveKit + coturn TURN + Egress + MinIO + Gateway
+# Market-grade layers: TURN (coturn), HLS (Egress), multi-tenant Gateway, CDN templates.
+# Production Echo: AWS S3 (ADR-006); MinIO is local-only.
 
 name: softqraft-realtime-media
 
@@ -38,6 +39,56 @@ services:
       - "7881:7881"
       # Single media UDP port (must match livekit.yaml rtc.udp_port)
       - "7882:7882/udp"
+
+  # NAT traversal for mobile / restrictive networks (ADR-008)
+  coturn:
+    image: coturn/coturn:4.6.2
+    restart: unless-stopped
+    network_mode: host
+    # host network: ports 3478/udp+tcp, 5349, 49160-49200 on the machine
+    # On Docker Desktop Windows, host network is limited — see docs/operations/turn-hls-cdn.md
+    command:
+      - "-n"
+      - "--log-file=stdout"
+      - "--listening-port=3478"
+      - "--fingerprint"
+      - "--lt-cred-mech"
+      - "--realm=${TURN_REALM:-softqraft.local}"
+      - "--user=${TURN_USERNAME:-softqraft}:${TURN_PASSWORD:-softqraftturn}"
+      - "--external-ip=${TURN_EXTERNAL_IP:-}"
+      - "--min-port=49160"
+      - "--max-port=49200"
+      - "--no-multicast-peers"
+      - "--no-cli"
+    profiles:
+      - turn
+      - full
+
+  # Bridge profile for platforms where network_mode:host is weak (Docker Desktop)
+  coturn-bridge:
+    image: coturn/coturn:4.6.2
+    restart: unless-stopped
+    command:
+      - "-n"
+      - "--log-file=stdout"
+      - "--listening-port=3478"
+      - "--fingerprint"
+      - "--lt-cred-mech"
+      - "--realm=${TURN_REALM:-softqraft.local}"
+      - "--user=${TURN_USERNAME:-softqraft}:${TURN_PASSWORD:-softqraftturn}"
+      - "--external-ip=${TURN_EXTERNAL_IP:-}"
+      - "--min-port=49160"
+      - "--max-port=49200"
+      - "--no-multicast-peers"
+      - "--no-cli"
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp"
+      - "5349:5349"
+      - "5349:5349/udp"
+      - "49160-49200:49160-49200/udp"
+    profiles:
+      - turn-bridge
 
   # Local S3-compatible storage for recording smoke tests.
   # Production Echo stays on AWS S3 (set GATEWAY / egress request credentials).
@@ -123,6 +174,19 @@ services:
       S3_ENDPOINT: http://minio:9000
       S3_FORCE_PATH_STYLE: "true"
       RECORDING_KEY_TEMPLATE: ${RECORDING_KEY_TEMPLATE:-recordings/{externalId}/{sessionId}-{time}.mp4}
+      HLS_KEY_TEMPLATE: ${HLS_KEY_TEMPLATE:-hls/{externalId}/{sessionId}}
+      HLS_PUBLIC_BASE_URL: ${HLS_PUBLIC_BASE_URL:-http://localhost:9000/sqrm-recordings}
+      CDN_PUBLIC_BASE_URL: ${CDN_PUBLIC_BASE_URL:-}
+      # Multi-tenant: tenantId:apiKey:maxSessions:maxEgress (comma-separated)
+      # Example: clatters:dev-local-key:50:10,demo:demo-key:20:5
+      GATEWAY_TENANTS: ${GATEWAY_TENANTS:-}
+      # TURN iceServers returned on participant tokens (coturn profiles turn / turn-bridge)
+      TURN_ENABLED: ${TURN_ENABLED:-true}
+      TURN_HOST: ${TURN_HOST:-host.docker.internal}
+      TURN_PORT: ${TURN_PORT:-3478}
+      TURN_USERNAME: ${TURN_USERNAME:-softqraft}
+      TURN_PASSWORD: ${TURN_PASSWORD:-softqraftturn}
+      TURN_URLS: ${TURN_URLS:-}
       # Comma-separated consumer webhook URLs (e.g. Clatters Echo finalize)
       WEBHOOK_FORWARD_URLS: ${WEBHOOK_FORWARD_URLS:-}
     ports:

@@ -1,7 +1,7 @@
 # Phased delivery
 
 **Last updated:** 2026-08-02  
-**Current phase:** **Phase 2 — dual-run readiness (in progress)**  
+**Current phase:** **Phase 2 dual-run (in progress) + Phase 3a–d market-grade slice (implemented)**  
 **Phase 1:** ✅ Complete (local operator verification)
 
 | Phase | Name | Status | Exit criteria |
@@ -9,7 +9,7 @@
 | **0** | Foundation | ✅ Done | Docs, monorepo, ADRs, OpenAPI |
 | **1** | Media plane parity | ✅ Done | Self-host LiveKit + Egress; publish + MP4 recording |
 | **2** | Gateway product + dual-run | 🔄 In progress | Consumer can dual-run / integrate via Gateway; staging path ready |
-| **3** | Audience scale | ⏳ Not started | HLS/LL-HLS + CDN path toward 10k viewers |
+| **3** | Audience scale / market-grade | 🔄 3a–d done | TURN + HLS egress + multi-tenant + CDN templates; 3e load tests later |
 | **4** | Production cutover | ⏳ Not started | Clatters primary on self-host; rollback tested |
 | **5** | Harden & scale | ⏳ Not started | Multi-node, SLOs, multi-show capacity |
 
@@ -66,11 +66,23 @@ Deliverables:
 
 ---
 
-## Phase 3 — Audience scale ⏳
+## Phase 3 — Audience scale / market-grade 🔄
 
-- HLS / LL-HLS egress + CDN  
-- Audience player contract  
+**ADR-008 stack (no mandatory SaaS subs):**
+
+| Slice | Status | Deliverable |
+|-------|--------|-------------|
+| **3a** | ✅ | coturn Compose profiles + Gateway `iceServers` on tokens |
+| **3b** | ✅ | `room_composite_hls` → S3/MinIO + `playback.hlsUrl` |
+| **3c** | ✅ | `GATEWAY_TENANTS` keys + concurrent session/egress quotas |
+| **3d** | ✅ | Cloudflare / Bunny templates + [turn-hls-cdn.md](../operations/turn-hls-cdn.md) |
+| **3e** | ⏳ | Load tests, ABR ladders, multi-node TURN |
+
+Remaining Phase 3:
+
+- Audience player contract (hls.js) in examples  
 - Load-test plan toward 10k passive viewers  
+- Production origin + CDN cutover for a real show  
 
 ---
 
@@ -85,5 +97,5 @@ Deliverables:
 ## Phase 5 — Harden ⏳
 
 - Multi-node LiveKit + Egress pool  
-- TURN for harsh NAT  
+- Multi-region TURN / Redis-backed quotas  
 - SLOs, capacity planning  

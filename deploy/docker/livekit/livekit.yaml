@@ -31,6 +31,9 @@ webhook:
   urls:
     - http://gateway:8080/v1/webhooks/livekit
 
+# TURN: use external coturn (deploy/compose profile turn | turn-bridge | full).
+# LiveKit embedded TURN is DISABLED so port 3478 is free for coturn (ADR-008).
+# Clients receive iceServers from Gateway token responses (TURN_* env).
+# See docs/operations/turn-hls-cdn.md
 turn:
   enabled: false
-

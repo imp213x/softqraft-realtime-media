@@ -1,7 +1,7 @@
 import type { EgressJobRecord, SessionRecord } from "./types.js";
 
 /**
- * In-memory store for Phase 1 single-node Gateway.
+ * In-memory store for Phase 1–3 single-node Gateway.
  * Production will persist session metadata (Postgres) while LiveKit remains room SoT.
  */
 export class SessionStore {
@@ -13,7 +13,9 @@ export class SessionStore {
   create(record: SessionRecord): SessionRecord {
     this.sessions.set(record.sessionId, record);
     if (record.idempotencyKey) {
-      this.byIdempotency.set(record.idempotencyKey, record.sessionId);
+      // Scope idempotency by tenant to avoid cross-tenant collisions
+      const idempKey = `${record.tenantId ?? "_"}:${record.idempotencyKey}`;
+      this.byIdempotency.set(idempKey, record.sessionId);
     }
     return record;
   }
@@ -22,18 +24,28 @@ export class SessionStore {
     return this.sessions.get(sessionId);
   }
 
-  getByIdempotencyKey(key: string): SessionRecord | undefined {
-    const id = this.byIdempotency.get(key);
+  getByIdempotencyKey(
+    key: string,
+    tenantId: string | null,
+  ): SessionRecord | undefined {
+    const idempKey = `${tenantId ?? "_"}:${key}`;
+    const id = this.byIdempotency.get(idempKey);
     return id ? this.sessions.get(id) : undefined;
   }
 
-  list(status?: string, limit = 20): SessionRecord[] {
+  list(
+    status?: string,
+    limit = 20,
+    tenantId?: string | null,
+  ): SessionRecord[] {
     const all = [...this.sessions.values()].sort((a, b) =>
       b.createdAt.localeCompare(a.createdAt),
     );
-    const filtered = status
-      ? all.filter((s) => s.status === status)
-      : all;
+    let filtered = status ? all.filter((s) => s.status === status) : all;
+    if (tenantId !== undefined) {
+      // null tenantId filter = only unscoped; string = that tenant
+      filtered = filtered.filter((s) => s.tenantId === tenantId);
+    }
     return filtered.slice(0, limit);
   }
 
@@ -85,4 +97,24 @@ export class SessionStore {
       .map((id) => this.egressById.get(id))
       .filter((j): j is EgressJobRecord => Boolean(j));
   }
+}
+
+/** Ensure caller tenant owns the session (or legacy unscoped). */
+export function assertSessionAccess(
+  session: SessionRecord | undefined,
+  tenantId: string | null,
+): session is SessionRecord {
+  if (!session) return false;
+  // Multi-tenant key: must match
+  if (tenantId !== null && session.tenantId !== tenantId) {
+    return false;
+  }
+  // Legacy key (tenantId null): can only access unscoped sessions when tenants
+  // are configured — if session has a tenant, legacy keys cannot see it.
+  if (tenantId === null && session.tenantId !== null) {
+    // Allow if no multi-tenant isolation was intended (legacy-only mode stores null)
+    // When session.tenantId is set, require matching tenant key.
+    return false;
+  }
+  return true;
 }

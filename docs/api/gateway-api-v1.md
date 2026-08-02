@@ -172,6 +172,48 @@ POST /v1/sessions/sess_01H.../egress
 
 Supported types (profile-gated): `room_composite_file`, `room_composite_hls`, `room_composite_rtmp`, `track`, `participant`.
 
+**Implemented now:** `room_composite_file`, `room_composite_hls`. Others return `501`.
+
+HLS response includes `playback.hlsUrl` when `HLS_PUBLIC_BASE_URL` or `CDN_PUBLIC_BASE_URL` is configured.
+
+### Tokens include ICE servers
+
+```http
+POST /v1/sessions/{sessionId}/tokens
+```
+
+```json
+{
+  "token": "eyJ...",
+  "identity": "host-1",
+  "role": "host",
+  "expiresAt": "2026-08-02T12:00:00.000Z",
+  "realtimeUrl": "ws://localhost:7880",
+  "iceServers": [
+    { "urls": ["stun:stun.l.google.com:19302"] },
+    {
+      "urls": ["turn:192.168.1.1:3478?transport=udp"],
+      "username": "softqraft",
+      "credential": "..."
+    }
+  ]
+}
+```
+
+Pass `iceServers` into the client `Room.connect` `rtcConfig` for NAT traversal (coturn).
+
+### Multi-tenant auth
+
+```bash
+# Legacy single product
+Authorization: Bearer dev-local-key
+
+# Multi-tenant (GATEWAY_TENANTS=tenantId:apiKey:maxSessions:maxEgress)
+Authorization: Bearer <tenant-api-key>
+```
+
+Sessions are scoped to the tenant that created them. Concurrent session/egress over-quota returns `429` with `code: quota_exceeded`.
+
 ---
 
 ## Error model
@@ -187,6 +229,16 @@ Supported types (profile-gated): `room_composite_file`, `room_composite_hls`, `r
 ```
 
 Stable `code` values for Clatters mapping; human `message` may change.
+
+| code | Typical HTTP |
+|------|--------------|
+| `unauthorized` | 401 |
+| `session_not_found` | 404 |
+| `egress_not_found` | 404 |
+| `validation_error` | 400 / 501 |
+| `quota_exceeded` | 429 |
+| `dependency_unavailable` | 502 / 503 |
+| `internal_error` | 500 |
 
 ---
 

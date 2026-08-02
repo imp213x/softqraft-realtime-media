@@ -8,6 +8,8 @@ import type {
 
 export interface SessionRecord {
   sessionId: string;
+  /** Owning tenant (null = legacy unscoped key) */
+  tenantId: string | null;
   externalId: string | null;
   roomName: string;
   status: SessionStatus;
@@ -27,22 +29,29 @@ export interface SessionRecord {
 export interface EgressJobRecord {
   egressId: string;
   sessionId: string;
+  tenantId: string | null;
   type: EgressType;
   status: EgressStatus;
   filepath?: string;
+  /** HLS object key prefix when type is room_composite_hls */
+  hlsPrefix?: string;
   playback: { hlsUrl: string | null };
   error: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Whether quota counter was incremented (for terminal release) */
+  quotaHeld?: boolean;
 }
 
 export function toPublicSession(session: SessionRecord) {
   return {
     sessionId: session.sessionId,
+    tenantId: session.tenantId,
     externalId: session.externalId,
     roomName: session.roomName,
     status: session.status,
     profile: session.profile,
+    audienceMode: session.audienceMode,
     realtime: session.realtime,
     playback: session.playback,
     metadata: session.metadata,
