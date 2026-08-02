@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import cors from "@fastify/cors";
 import { loadConfig } from "./config.js";
 import { requestIdHook } from "./lib/request-id.js";
 import { registerRawBodyHook } from "./lib/raw-body.js";
@@ -16,6 +17,13 @@ async function main() {
 
   const app = Fastify({
     logger: true,
+  });
+
+  // Local HTML demos + browser clients (tighten origins in production)
+  await app.register(cors, {
+    origin: true,
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Authorization", "Content-Type", "X-Request-Id"],
   });
 
   await requestIdHook(app);

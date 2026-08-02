@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SoftQraft Local Live Test</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: system-ui, Segoe UI, sans-serif;
+      }
+      body {
+        margin: 0;
+        background: #0b0d12;
+        color: #e8ecf4;
+      }
+      header {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid #243044;
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      h1 {
+        font-size: 1rem;
+        margin: 0;
+        font-weight: 600;
+      }
+      .badge {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 999px;
+        background: #1a2333;
+        color: #9fb3d1;
+      }
+      main {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        min-height: calc(100vh - 58px);
+      }
+      @media (max-width: 900px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+      }
+      aside {
+        padding: 1rem;
+        border-right: 1px solid #243044;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      label {
+        font-size: 0.75rem;
+        color: #9fb3d1;
+        display: block;
+        margin-bottom: 0.25rem;
+      }
+      input,
+      select,
+      button,
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        border-radius: 8px;
+        border: 1px solid #334155;
+        background: #111827;
+        color: #e8ecf4;
+        padding: 0.55rem 0.65rem;
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+        background: #2563eb;
+        border-color: #2563eb;
+        font-weight: 600;
+      }
+      button.secondary {
+        background: #1e293b;
+        border-color: #334155;
+      }
+      button.danger {
+        background: #b91c1c;
+        border-color: #b91c1c;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      #stage {
+        padding: 1rem;
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        align-content: start;
+      }
+      .tile {
+        background: #111827;
+        border: 1px solid #243044;
+        border-radius: 12px;
+        overflow: hidden;
+        min-height: 180px;
+        position: relative;
+      }
+      .tile video {
+        width: 100%;
+        height: 100%;
+        min-height: 180px;
+        object-fit: cover;
+        background: #000;
+      }
+      .tile .tag {
+        position: absolute;
+        left: 0.5rem;
+        bottom: 0.5rem;
+        background: rgba(0, 0, 0, 0.65);
+        padding: 0.2rem 0.45rem;
+        border-radius: 6px;
+        font-size: 0.75rem;
+      }
+      #log {
+        height: 140px;
+        resize: vertical;
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 0.75rem;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>SoftQraft Local Live Test</h1>
+      <span class="badge" id="statusBadge">disconnected</span>
+      <span class="badge" id="sessionBadge">no session</span>
+    </header>
+    <main>
+      <aside>
+        <div>
+          <label>Gateway base URL</label>
+          <input id="gatewayUrl" value="http://localhost:8080" />
+        </div>
+        <div>
+          <label>Service API key</label>
+          <input id="apiKey" value="dev-local-key" />
+        </div>
+        <div>
+          <label>Role</label>
+          <select id="role">
+            <option value="host" selected>host (publish)</option>
+            <option value="realtime_viewer">realtime_viewer</option>
+            <option value="guest">guest</option>
+          </select>
+        </div>
+        <div>
+          <label>Identity</label>
+          <input id="identity" value="local-host" />
+        </div>
+        <button id="btnGoLive">Go live (create + join)</button>
+        <button id="btnJoin" class="secondary">Join existing session</button>
+        <div>
+          <label>Existing session id</label>
+          <input id="sessionId" placeholder="sess_…" />
+        </div>
+        <button id="btnEgress" class="secondary" disabled>Start Echo egress (MP4)</button>
+        <button id="btnLeave" class="danger" disabled>Leave / end</button>
+        <div>
+          <label>Log</label>
+          <textarea id="log" readonly></textarea>
+        </div>
+      </aside>
+      <section id="stage"></section>
+    </main>
+
+    <script type="module">
+      import {
+        Room,
+        RoomEvent,
+        Track,
+        createLocalTracks,
+      } from "https://cdn.jsdelivr.net/npm/livekit-client@2.9.1/+esm";
+
+      const el = (id) => document.getElementById(id);
+      const logEl = el("log");
+      const stage = el("stage");
+
+      let room = null;
+      let sessionId = null;
+      let realtimeUrl = null;
+
+      function log(msg) {
+        const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        logEl.value = `${line}\n${logEl.value}`.slice(0, 8000);
+        console.log(msg);
+      }
+
+      function setStatus(text) {
+        el("statusBadge").textContent = text;
+      }
+
+      function setSession(id) {
+        sessionId = id || null;
+        el("sessionBadge").textContent = id ? id : "no session";
+        el("sessionId").value = id || "";
+        el("btnEgress").disabled = !id || !room;
+        el("btnLeave").disabled = !room && !id;
+      }
+
+      async function api(path, { method = "GET", body } = {}) {
+        const base = el("gatewayUrl").value.replace(/\/$/, "");
+        const res = await fetch(`${base}${path}`, {
+          method,
+          headers: {
+            Authorization: `Bearer ${el("apiKey").value}`,
+            "Content-Type": "application/json",
+          },
+          body: body ? JSON.stringify(body) : method === "POST" ? "{}" : undefined,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.error?.message || `HTTP ${res.status}`);
+        }
+        return data;
+      }
+
+      function attachTrack(track, identity, kind) {
+        if (track.kind !== Track.Kind.Video && track.kind !== Track.Kind.Audio) return;
+        const id = `tile-${identity}-${track.sid || track.kind}`;
+        let tile = document.getElementById(id);
+        if (!tile) {
+          tile = document.createElement("div");
+          tile.className = "tile";
+          tile.id = id;
+          const tag = document.createElement("div");
+          tag.className = "tag";
+          tag.textContent = `${identity} · ${kind}`;
+          tile.appendChild(tag);
+          stage.appendChild(tile);
+        }
+        if (track.kind === Track.Kind.Video) {
+          let video = tile.querySelector("video");
+          if (!video) {
+            video = document.createElement("video");
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = identity === el("identity").value;
+            tile.prepend(video);
+          }
+          track.attach(video);
+        } else {
+          const audio = track.attach();
+          audio.autoplay = true;
+          if (identity === el("identity").value) audio.muted = true;
+          tile.appendChild(audio);
+        }
+      }
+
+      function clearStage() {
+        stage.innerHTML = "";
+      }
+
+      async function connectWithToken(token, url) {
+        if (room) {
+          await room.disconnect();
+          room = null;
+        }
+        clearStage();
+        room = new Room({ adaptiveStream: true, dynacast: true });
+        room
+          .on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
+            attachTrack(track, participant.identity, "remote");
+            log(`subscribed ${participant.identity} ${track.kind}`);
+          })
+          .on(RoomEvent.TrackUnsubscribed, (track) => {
+            track.detach().forEach((el) => el.remove());
+          })
+          .on(RoomEvent.Disconnected, () => {
+            setStatus("disconnected");
+            log("disconnected");
+          });
+
+        setStatus("connecting…");
+        await room.connect(url, token);
+        setStatus(`connected · ${room.name}`);
+        log(`connected to room ${room.name} as ${room.localParticipant.identity}`);
+
+        const role = el("role").value;
+        if (role === "host" || role === "guest" || role === "cohost") {
+          const tracks = await createLocalTracks({ audio: true, video: true });
+          for (const track of tracks) {
+            await room.localParticipant.publishTrack(track);
+            attachTrack(track, room.localParticipant.identity, "local");
+          }
+          log("published camera + microphone");
+        }
+
+        el("btnEgress").disabled = !sessionId;
+        el("btnLeave").disabled = false;
+      }
+
+      async function goLive() {
+        try {
+          el("btnGoLive").disabled = true;
+          const session = await api("/v1/sessions", {
+            method: "POST",
+            body: {
+              idempotencyKey: `local-live-${Date.now()}`,
+              externalId: "local-dev",
+              profile: "creator_live_webrtc",
+              audience: { mode: "realtime", visibility: "public" },
+              metadata: { source: "local-live-test" },
+            },
+          });
+          setSession(session.sessionId);
+          realtimeUrl = session.realtime?.url;
+          log(`session ${session.sessionId} room=${session.roomName}`);
+
+          const minted = await api(`/v1/sessions/${session.sessionId}/tokens`, {
+            method: "POST",
+            body: {
+              identity: el("identity").value || "local-host",
+              name: el("identity").value || "local-host",
+              role: el("role").value,
+              ttlSeconds: 3600,
+            },
+          });
+          realtimeUrl = minted.realtimeUrl || realtimeUrl;
+          await connectWithToken(minted.token, realtimeUrl);
+        } catch (err) {
+          log(`error: ${err.message || err}`);
+          setStatus("error");
+          alert(err.message || String(err));
+        } finally {
+          el("btnGoLive").disabled = false;
+        }
+      }
+
+      async function joinExisting() {
+        try {
+          const id = el("sessionId").value.trim();
+          if (!id) throw new Error("Enter a session id");
+          const session = await api(`/v1/sessions/${id}`);
+          setSession(session.sessionId);
+          realtimeUrl = session.realtime?.url;
+          const minted = await api(`/v1/sessions/${id}/tokens`, {
+            method: "POST",
+            body: {
+              identity: el("identity").value || `viewer-${Date.now()}`,
+              role: el("role").value,
+              ttlSeconds: 3600,
+            },
+          });
+          await connectWithToken(minted.token, minted.realtimeUrl || realtimeUrl);
+        } catch (err) {
+          log(`error: ${err.message || err}`);
+          alert(err.message || String(err));
+        }
+      }
+
+      async function startEgress() {
+        if (!sessionId) return;
+        try {
+          const job = await api(`/v1/sessions/${sessionId}/egress`, {
+            method: "POST",
+            body: {
+              type: "room_composite_file",
+              options: {
+                keyTemplate: "recordings/{externalId}/{sessionId}-{time}.mp4",
+              },
+            },
+          });
+          log(`egress started ${job.egressId} status=${job.status}`);
+          alert(`Egress started: ${job.egressId}\nCheck MinIO bucket sqrm-recordings after you publish.`);
+        } catch (err) {
+          log(`egress error: ${err.message || err}`);
+          alert(err.message || String(err));
+        }
+      }
+
+      async function leave() {
+        try {
+          if (room) {
+            await room.disconnect();
+            room = null;
+          }
+          if (sessionId && el("role").value === "host") {
+            await api(`/v1/sessions/${sessionId}/end`, { method: "POST", body: {} });
+            log(`ended session ${sessionId}`);
+          }
+        } catch (err) {
+          log(`leave error: ${err.message || err}`);
+        } finally {
+          clearStage();
+          setSession(null);
+          setStatus("disconnected");
+          el("btnLeave").disabled = true;
+          el("btnEgress").disabled = true;
+        }
+      }
+
+      el("btnGoLive").onclick = goLive;
+      el("btnJoin").onclick = joinExisting;
+      el("btnEgress").onclick = startEgress;
+      el("btnLeave").onclick = leave;
+
+      // Query params from start script
+      const params = new URLSearchParams(location.search);
+      if (params.get("gateway")) el("gatewayUrl").value = params.get("gateway");
+      if (params.get("apiKey")) el("apiKey").value = params.get("apiKey");
+      if (params.get("role")) el("role").value = params.get("role");
+      if (params.get("identity")) el("identity").value = params.get("identity");
+      if (params.get("sessionId")) el("sessionId").value = params.get("sessionId");
+      if (params.get("autostart") === "1") {
+        goLive();
+      }
+
+      log("Ready. Click Go live (allow camera/mic).");
+    </script>
+  </body>
+</html>
