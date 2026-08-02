@@ -58,13 +58,35 @@ LiveKit API secret:  softqraft_dev_secret_change_me_before_prod
 
 Env file: `deploy/compose/.env` (from `deploy/env/media.env.example`).
 
-## How to test Live
+## Local recording storage (Echo)
 
-1. **Host:** page opens as `host` → click **Go live** → allow camera/mic.  
-2. Copy the **session id** from the badge.  
-3. **Viewer:** new tab → same UI → role `realtime_viewer` → paste session id → **Join existing session**.  
-4. Optional: on host, **Start Echo egress** → after a short publish, check MinIO bucket `sqrm-recordings`.  
-5. **Leave / end** on host ends the LiveKit room.
+Compose already uses **MinIO** as local S3 (not AWS):
+
+| Setting | Value |
+|---------|--------|
+| Endpoint | `http://minio:9000` (in Docker) / `http://localhost:9000` (host) |
+| Bucket | `sqrm-recordings` |
+| Keys | `softqraft` / `softqraftsecret` |
+| Object prefix | `recordings/local-dev/{sessionId}-{time}.mp4` |
+| Console | http://localhost:9001 |
+
+Gateway env already points at this. Production Echo on AWS is a later env swap (ADR-006).
+
+List files:
+
+```powershell
+.\scripts\list-local-recordings.ps1
+```
+
+## How to test Live + Echo
+
+1. **Host:** open UI as `host` → **Go live** → allow camera/mic.  
+2. With **Auto-start Echo** checked (default), recording starts ~1.5s after publish.  
+   Or click **Start Echo egress (MP4 → MinIO)** manually.  
+3. Stay on camera **15–30 seconds** (empty rooms produce no useful file).  
+4. Click **Stop Echo (finalize MP4)** (or Leave — it stops Echo first).  
+5. Open MinIO → bucket `sqrm-recordings` → `recordings/local-dev/`.  
+6. **Viewer (optional):** new tab, `role=realtime_viewer` + `sessionId=…` → **Join existing session**.
 
 ## If the UI cannot call the API (CORS)
 

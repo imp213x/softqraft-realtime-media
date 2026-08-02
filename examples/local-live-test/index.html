@@ -166,8 +166,23 @@
           <label>Existing session id</label>
           <input id="sessionId" placeholder="sess_…" />
         </div>
-        <button id="btnEgress" class="secondary" disabled>Start Echo egress (MP4)</button>
+        <label style="display:flex;align-items:center;gap:0.5rem;color:#e8ecf4">
+          <input type="checkbox" id="autoEcho" checked style="width:auto" />
+          Auto-start Echo to local MinIO after publish
+        </label>
+        <button id="btnEgress" class="secondary" disabled>Start Echo egress (MP4 → MinIO)</button>
+        <button id="btnStopEgress" class="secondary" disabled>Stop Echo (finalize MP4)</button>
         <button id="btnLeave" class="danger" disabled>Leave / end</button>
+        <p style="margin:0;font-size:0.75rem;color:#9fb3d1;line-height:1.4">
+          Local storage: MinIO bucket <code>sqrm-recordings</code><br />
+          Console:
+          <a href="http://localhost:9001" target="_blank" rel="noreferrer" style="color:#93c5fd"
+            >http://localhost:9001</a
+          >
+          (softqraft / softqraftsecret)<br />
+          Path: <code>recordings/local-dev/…</code>
+        </p>
+        <span class="badge" id="echoBadge">echo: off</span>
         <div>
           <label>Log</label>
           <textarea id="log" readonly></textarea>
@@ -191,6 +206,7 @@
       let room = null;
       let sessionId = null;
       let realtimeUrl = null;
+      let egressId = null;
 
       function log(msg) {
         const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
@@ -202,11 +218,16 @@
         el("statusBadge").textContent = text;
       }
 
+      function setEcho(text) {
+        el("echoBadge").textContent = text;
+      }
+
       function setSession(id) {
         sessionId = id || null;
         el("sessionBadge").textContent = id ? id : "no session";
         el("sessionId").value = id || "";
         el("btnEgress").disabled = !id || !room;
+        el("btnStopEgress").disabled = !egressId;
         el("btnLeave").disabled = !room && !id;
       }
 
@@ -296,6 +317,11 @@
             attachTrack(track, room.localParticipant.identity, "local");
           }
           log("published camera + microphone");
+          // Wait briefly so Egress/Chrome sees tracks
+          if (el("autoEcho").checked && sessionId) {
+            await new Promise((r) => setTimeout(r, 1500));
+            await startEgress({ quiet: true });
+          }
         }
 
         el("btnEgress").disabled = !sessionId;
@@ -305,19 +331,22 @@
       async function goLive() {
         try {
           el("btnGoLive").disabled = true;
+          egressId = null;
+          setEcho("echo: off");
           const session = await api("/v1/sessions", {
             method: "POST",
             body: {
               idempotencyKey: `local-live-${Date.now()}`,
               externalId: "local-dev",
-              profile: "creator_live_webrtc",
+              profile: "live_plus_recording",
               audience: { mode: "realtime", visibility: "public" },
-              metadata: { source: "local-live-test" },
+              metadata: { source: "local-live-test", storage: "minio-local" },
             },
           });
           setSession(session.sessionId);
           realtimeUrl = session.realtime?.url;
           log(`session ${session.sessionId} room=${session.roomName}`);
+          log("storage: local MinIO bucket sqrm-recordings");
 
           const minted = await api(`/v1/sessions/${session.sessionId}/tokens`, {
             method: "POST",
@@ -361,9 +390,10 @@
         }
       }
 
-      async function startEgress() {
+      async function startEgress({ quiet = false } = {}) {
         if (!sessionId) return;
         try {
+          setEcho("echo: starting…");
           const job = await api(`/v1/sessions/${sessionId}/egress`, {
             method: "POST",
             body: {
@@ -373,16 +403,52 @@
               },
             },
           });
-          log(`egress started ${job.egressId} status=${job.status}`);
-          alert(`Egress started: ${job.egressId}\nCheck MinIO bucket sqrm-recordings after you publish.`);
+          egressId = job.egressId;
+          el("btnStopEgress").disabled = false;
+          setEcho(`echo: ${job.status || "active"} · ${egressId}`);
+          log(`egress started ${egressId} → MinIO sqrm-recordings/recordings/local-dev/`);
+          log("Keep publishing 15–30s, then Stop Echo (or Leave) to finalize MP4.");
+          if (!quiet) {
+            alert(
+              `Echo started: ${egressId}\n\nKeep camera on 15–30s, then click Stop Echo.\nOpen MinIO: http://localhost:9001\nbucket: sqrm-recordings`,
+            );
+          }
         } catch (err) {
+          setEcho("echo: error");
           log(`egress error: ${err.message || err}`);
+          if (!quiet) alert(err.message || String(err));
+        }
+      }
+
+      async function stopEgress() {
+        if (!egressId) return;
+        try {
+          setEcho("echo: stopping…");
+          const job = await api(`/v1/egress/${egressId}/stop`, {
+            method: "POST",
+            body: {},
+          });
+          setEcho(`echo: ${job.status || "stopped"}`);
+          log(`egress stopped ${egressId} status=${job.status}`);
+          log("Check MinIO console → sqrm-recordings → recordings/local-dev/");
+          el("btnStopEgress").disabled = true;
+        } catch (err) {
+          log(`stop egress error: ${err.message || err}`);
           alert(err.message || String(err));
         }
       }
 
       async function leave() {
         try {
+          if (egressId) {
+            try {
+              await stopEgress();
+              // Give Egress a moment to flush the file to MinIO
+              await new Promise((r) => setTimeout(r, 2000));
+            } catch {
+              /* continue teardown */
+            }
+          }
           if (room) {
             await room.disconnect();
             room = null;
@@ -395,16 +461,20 @@
           log(`leave error: ${err.message || err}`);
         } finally {
           clearStage();
+          egressId = null;
+          setEcho("echo: off");
           setSession(null);
           setStatus("disconnected");
           el("btnLeave").disabled = true;
           el("btnEgress").disabled = true;
+          el("btnStopEgress").disabled = true;
         }
       }
 
       el("btnGoLive").onclick = goLive;
       el("btnJoin").onclick = joinExisting;
-      el("btnEgress").onclick = startEgress;
+      el("btnEgress").onclick = () => startEgress({ quiet: false });
+      el("btnStopEgress").onclick = stopEgress;
       el("btnLeave").onclick = leave;
 
       // Query params from start script
