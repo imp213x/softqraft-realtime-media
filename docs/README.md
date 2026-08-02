@@ -1,14 +1,24 @@
 # Documentation index
 
-Professional documentation for the **Clatters Media Platform** — a self-hosted, API-pluggable live media stack that replaces managed LiveKit Cloud + Egress for production Clatters Live.
+**Realtime Media Platform** — self-hosted, app-agnostic live/realtime media (LiveKit + Egress + HTTP Gateway).
 
 | Section | Purpose |
 |---------|---------|
-| [architecture/](architecture/) | System design, hybrid SFU + CDN model, component boundaries |
-| [api/](api/) | HTTP gateway contract, auth, versioning |
-| [integration/](integration/) | How Clatters (and other apps) plug in and migrate off managed stack |
-| [operations/](operations/) | Deploy, scale, network, runbooks |
-| [decisions/](decisions/) | Architecture Decision Records (ADRs) |
-| [roadmap/](roadmap/) | Phased delivery and start-here order |
+| [architecture/](architecture/) | System design, capability profiles, cost model |
+| [api/](api/) | Gateway HTTP contract + OpenAPI |
+| [integration/](integration/) | Generic plug-in guide + per-consumer inventories |
+| [operations/](operations/) | Deploy and runbooks |
+| [decisions/](decisions/) | ADRs |
+| [roadmap/](roadmap/) | Phases and start-here |
 
 **Start here:** [roadmap/00-start-here.md](roadmap/00-start-here.md)
+
+### Key docs
+
+| Doc | Description |
+|-----|-------------|
+| [architecture/system-overview.md](architecture/system-overview.md) | Active architecture |
+| [architecture/capability-profiles.md](architecture/capability-profiles.md) | Situation matrix |
+| [integration/generic-integration-guide.md](integration/generic-integration-guide.md) | Any-app integration |
+| [integration/consumers/the-scholar-clatters-inventory.md](integration/consumers/the-scholar-clatters-inventory.md) | Clatters inventory from production repo |
+| [decisions/ADR-005-app-agnostic-platform.md](decisions/ADR-005-app-agnostic-platform.md) | Agnostic product decision |

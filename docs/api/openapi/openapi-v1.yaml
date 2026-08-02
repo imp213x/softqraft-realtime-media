@@ -1,10 +1,11 @@
 openapi: 3.1.0
 info:
-  title: Clatters Media Platform Gateway API
+  title: Realtime Media Platform Gateway API
   version: 1.0.0
   description: |
-    HTTP control plane for self-hosted LiveKit + Egress.
-    Clatters backends integrate here; media clients use LiveKit SDKs with minted tokens.
+    Application-agnostic HTTP control plane for self-hosted LiveKit + Egress.
+    Any backend integrates here; media clients use LiveKit SDKs with minted tokens.
+    Capability profiles gate interactive, creator-live, HLS broadcast, and recording features.
 servers:
   - url: https://gateway.media.example.com
     description: Production (example)
@@ -345,6 +346,21 @@ components:
         idempotencyKey:
           type: string
           description: Client-supplied key for safe retries
+        externalId:
+          type: string
+          description: Caller domain id (workspace, event, show, …)
+        roomName:
+          type: string
+          description: Optional LiveKit room name; generated if omitted
+        profile:
+          type: string
+          enum:
+            - interactive
+            - creator_live_webrtc
+            - creator_live_hls
+            - hybrid_live
+            - recording_only
+            - live_plus_recording
         metadata:
           type: object
           additionalProperties: true
@@ -363,18 +379,33 @@ components:
             mode:
               type: string
               enum: [hls, realtime, hybrid]
-              default: hls
+              default: realtime
             visibility:
               type: string
               enum: [public, private]
               default: public
+        recording:
+          type: object
+          properties:
+            file:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                keyTemplate:
+                  type: string
     Session:
       type: object
       required: [sessionId, roomName, status, realtime, createdAt]
       properties:
         sessionId:
           type: string
+        externalId:
+          type: string
+          nullable: true
         roomName:
+          type: string
+        profile:
           type: string
         status:
           type: string
@@ -457,12 +488,12 @@ components:
         type:
           type: string
           enum:
+            - room_composite_file
             - room_composite_hls
-            - room_composite_mp4
             - room_composite_rtmp
             - track
             - participant
-          description: Align with Clatters production egress usage during migration
+          description: Profile-gated egress kinds (file = MP4/VOD; hls = live/archive segments)
         options:
           type: object
           additionalProperties: true

@@ -1,12 +1,13 @@
-# Clatters Media Platform
+# Realtime Media Platform
 
-Self-hosted, production-oriented live media stack for **Clatters** — a modular package that replaces managed **LiveKit Cloud + Egress** via:
+Self-hosted, **application-agnostic** live and realtime media stack:
 
-1. **Deployable media plane** — LiveKit Server, Redis, TURN, Egress  
-2. **HTTP Gateway API** — sessions, tokens, egress, playback (Clatters plugs in here)  
-3. **Hybrid delivery** — WebRTC stage + HLS/CDN for up to ~10k passive viewers  
+1. **Media plane** — LiveKit Server, Redis, TURN, Egress  
+2. **HTTP Gateway** — sessions, tokens, egress, playback (any backend plugs in)  
+3. **Capability profiles** — interactive calls, creator live (WebRTC or HLS), recording, hybrid  
 
-**Status:** Foundation (Phase 0) — docs, monorepo, Gateway skeleton, Compose bootstrap.
+Replace managed LiveKit Cloud (and expensive SFU fan-out) without rewriting client SDKs.  
+**Clatters / The_Scholar** is a supported consumer, not the product identity.
 
 ---
 
@@ -14,11 +15,26 @@ Self-hosted, production-oriented live media stack for **Clatters** — a modular
 
 | Doc | Purpose |
 |-----|---------|
-| **[docs/roadmap/00-start-here.md](docs/roadmap/00-start-here.md)** | **Where we start and why** |
+| **[docs/roadmap/00-start-here.md](docs/roadmap/00-start-here.md)** | Build order |
 | [docs/architecture/system-overview.md](docs/architecture/system-overview.md) | System design |
-| [docs/api/gateway-api-v1.md](docs/api/gateway-api-v1.md) | HTTP API contract |
-| [docs/integration/clatters-migration-guide.md](docs/integration/clatters-migration-guide.md) | Production migration |
-| [docs/README.md](docs/README.md) | Full documentation index |
+| [docs/architecture/capability-profiles.md](docs/architecture/capability-profiles.md) | Situations the platform covers |
+| [docs/api/gateway-api-v1.md](docs/api/gateway-api-v1.md) | HTTP contract |
+| [docs/integration/generic-integration-guide.md](docs/integration/generic-integration-guide.md) | Plug in any app |
+| [docs/integration/consumers/the-scholar-clatters-inventory.md](docs/integration/consumers/the-scholar-clatters-inventory.md) | Clatters production inventory |
+| [docs/README.md](docs/README.md) | Full index |
+
+---
+
+## Situations covered (profiles)
+
+| Profile | Use when |
+|---------|----------|
+| `interactive` | Meetings / small collaborative rooms |
+| `creator_live_webrtc` | Instagram-style live, audience on WebRTC |
+| `creator_live_hls` | Large audience via HLS + CDN (cost control) |
+| `hybrid_live` | Stage WebRTC + crowd HLS (+ optional VIP WebRTC) |
+| `recording_only` | Room composite / track → object storage |
+| `live_plus_recording` | Live + Echo/VOD style capture |
 
 ---
 
@@ -26,106 +42,49 @@ Self-hosted, production-oriented live media stack for **Clatters** — a modular
 
 ```text
 live-streaming-platform/
-├── docs/                      # Professional documentation tree
-│   ├── architecture/
-│   ├── api/                   # Gateway design + OpenAPI
-│   ├── integration/           # Clatters plug-in & migration
-│   ├── operations/
-│   ├── decisions/             # ADRs
-│   └── roadmap/
-├── services/
-│   └── gateway-api/           # HTTP control plane (TypeScript / Fastify)
-├── packages/
-│   └── shared/                # Shared types / error codes
-├── deploy/
-│   ├── compose/               # Docker Compose media plane
-│   ├── docker/                # LiveKit, Egress configs
-│   └── env/
+├── docs/                 # architecture, api, integration, ops, ADRs, roadmap
+├── services/gateway-api/ # agnostic HTTP control plane
+├── packages/shared/
+├── deploy/               # compose + LiveKit/Egress configs
 ├── scripts/
-└── examples/
-    └── clatters-integration/
-```
-
----
-
-## Architecture (one glance)
-
-```text
-Clatters backend ──HTTPS──► Gateway API ──► LiveKit + Egress
-Clatters host     ──WebRTC─► LiveKit SFU
-Clatters audience ──HLS────► CDN ◄── Egress segments
+└── examples/             # consumer-specific adapters only
 ```
 
 ---
 
 ## Quick start (foundation)
 
-### Gateway skeleton
-
 ```bash
-# From repo root (requires Node 20+ and pnpm)
 pnpm install
 pnpm --filter @clatters-media/shared build
 pnpm dev:gateway
 ```
 
 ```powershell
-# Smoke (PowerShell)
 .\scripts\smoke-gateway.ps1
 ```
 
-Default service key: `dev-local-key`  
-Health: `GET http://localhost:8080/health`
-
-### Media plane (LiveKit + Redis)
+Media plane:
 
 ```bash
 cd deploy/compose
 docker compose up -d
 ```
 
-Generate production keys before staging:
-
-```bash
-./scripts/generate-livekit-keys.sh
-```
-
-Update `deploy/docker/livekit/livekit.yaml` and env templates. Enable Egress service when storage is configured.
+> Package scope `@clatters-media/*` is temporary; rename to a neutral scope is tracked in ADR-005.
 
 ---
 
-## Delivery phases
+## First consumer: Clatters (summary)
 
-| Phase | Focus |
-|------:|-------|
-| **0** | Docs, monorepo, OpenAPI, Gateway skeleton ← **current** |
-| **1** | Self-host LiveKit + Redis + TURN + **Egress** parity |
-| **2** | Full Gateway (tokens, egress jobs, playback) |
-| **3** | HLS + CDN audience path (10k) |
-| **4** | Clatters dual-run → cutover |
-| **5** | Multi-node harden |
+From [The_Scholar](https://github.com/imp213x/The_Scholar):
 
----
+- LiveKit **Cloud** today; rooms `workspace-{id}`  
+- Audience: **WebRTC** subscribe  
+- Egress: **room composite MP4 → S3** `live-echo/…` (Echo)  
+- Webhooks to app for egress completion  
 
-## Design decisions (summary)
-
-| ADR | Decision |
-|-----|----------|
-| [001](docs/decisions/ADR-001-self-hosted-livekit-drop-in.md) | Self-host LiveKit as drop-in media plane |
-| [002](docs/decisions/ADR-002-hybrid-webrtc-hls-delivery.md) | WebRTC stage + HLS/CDN audience |
-| [003](docs/decisions/ADR-003-gateway-api-boundary.md) | HTTP Gateway is Clatters integration boundary |
-| [004](docs/decisions/ADR-004-infrastructure-posture.md) | No LiveKit Cloud / no AWS primary media path |
-
----
-
-## Better ideas we will keep raising
-
-As build proceeds, expect recommendations such as:
-
-- **Multi-upstream Gateway** so Clatters feature-flag only switches Gateway config (Cloud vs self-host).  
-- **Audience default HLS** even if today’s Clatters uses WebRTC for all viewers (largest cost lever).  
-- **R2 (or zero-egress storage) + CDN** instead of AWS S3 egress for HLS.  
-- **Separate Egress worker pool** early if room-composite CPU contends with SFU.  
+Platform goal: self-host parity + optional HLS profile for 10k-scale cost control, without baking Nest/Echo into core APIs.
 
 ---
 

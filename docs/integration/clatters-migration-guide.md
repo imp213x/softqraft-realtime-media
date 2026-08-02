@@ -1,6 +1,10 @@
 # Clatters migration guide
 
-Migrate production Clatters Live from **managed LiveKit Cloud + Egress** to this **self-hosted Media Platform** with minimal risk.
+Migrate production Clatters Live from **managed LiveKit Cloud + Egress** to this **self-hosted Realtime Media Platform** with minimal risk.
+
+> Platform core is **app-agnostic**. This guide is consumer-specific.  
+> Inventory: [consumers/the-scholar-clatters-inventory.md](consumers/the-scholar-clatters-inventory.md)  
+> Generic plug-in: [generic-integration-guide.md](generic-integration-guide.md)
 
 ## Goals
 

@@ -1,127 +1,92 @@
-# System overview — Clatters Media Platform
+# System overview — Realtime Media Platform
 
 **Status:** Active  
-**Related:** [ADR-001](../decisions/ADR-001-self-hosted-livekit-drop-in.md), [ADR-002](../decisions/ADR-002-hybrid-webrtc-hls-delivery.md), [ADR-003](../decisions/ADR-003-gateway-api-boundary.md)
+**Related:** [ADR-001](../decisions/ADR-001-self-hosted-livekit-drop-in.md) … [ADR-005](../decisions/ADR-005-app-agnostic-platform.md), [capability-profiles.md](capability-profiles.md)
 
 ## 1. Product definition
 
-**Clatters Media Platform** is a self-hosted, modular live-media package that Clatters (and future apps) integrate via:
+This repository is an **application-agnostic, self-hosted realtime media platform**:
 
-1. **HTTP Gateway API** — orchestration (sessions, tokens, egress, playback)  
-2. **LiveKit WebRTC** — realtime stage media (existing Clatters SDKs)  
-3. **HLS/LL-HLS over CDN** — mass audience delivery  
+1. **Deployable media plane** — LiveKit Server, Redis, TURN, Egress  
+2. **HTTP Gateway API** — sessions, tokens, egress, playback, webhooks  
+3. **Delivery options** — WebRTC stage/audience and/or HLS/CDN, selected by **capability profiles**
 
-It is designed as a **full package** you deploy once and plug into Clatters by configuration, so managed LiveKit Cloud + managed Egress can be retired.
+Any app (Clatters, white-label live, meetings, webinars) plugs in via API/HTTP + LiveKit SDKs.  
+**Clatters / The_Scholar** is the first production consumer inventory, not the product identity.
+
+See consumer inventory: [../integration/consumers/the-scholar-clatters-inventory.md](../integration/consumers/the-scholar-clatters-inventory.md).
 
 ## 2. Logical architecture
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         CLATTERS APPLICATION                             │
-│   Mobile / Web clients          │          Clatters backend services     │
-└───────────────┬─────────────────┴───────────────────┬───────────────────┘
-                │ LiveKit SDK (WebRTC)                 │ HTTPS (Gateway)
-                │                                      │
-                ▼                                      ▼
-┌──────────────────────────────┐         ┌────────────────────────────────┐
-│   LiveKit Server (SFU)       │◄───────►│   Gateway API                  │
-│   + TURN                     │  admin  │   services/gateway-api         │
-└──────────────┬───────────────┘         │   tokens · sessions · egress   │
-               │                         │   playback URL resolution      │
-               │ Redis                   └───────────────┬────────────────┘
-               ▼                                         │
-┌──────────────────────────────┐                         │
-│   LiveKit Egress workers     │◄────────────────────────┘
-│   room / track / HLS / RTMP  │
+│                    ANY CONSUMER APPLICATION                              │
+│   (Clatters, other live apps, meetings, webinars, …)                    │
+└───────────────┬─────────────────────────────────┬───────────────────────┘
+                │ LiveKit SDK (WebRTC)             │ HTTPS Gateway
+                ▼                                  ▼
+┌──────────────────────────────┐    ┌─────────────────────────────────────┐
+│ LiveKit Server + TURN        │◄──►│ Gateway API                         │
+│ (SFU realtime)               │    │ sessions · tokens · egress ·        │
+└──────────────┬───────────────┘    │ playback · webhooks · profiles      │
+               │ Redis              └──────────────────┬──────────────────┘
+               ▼                                       │
+┌──────────────────────────────┐                       │
+│ Egress workers               │◄──────────────────────┘
+│ file MP4 · HLS · RTMP        │
 └──────────────┬───────────────┘
-               │ segments / files
+               │
                ▼
-┌──────────────────────────────┐         ┌────────────────────────────────┐
-│   Object storage (R2 / etc.) │────────►│   CDN (Cloudflare / Bunny)     │
-└──────────────────────────────┘         │   up to 10k+ passive viewers   │
-                                         └────────────────────────────────┘
+     Object storage ──► optional CDN (HLS audience / VOD)
 ```
 
-## 3. Module map (repository)
+## 3. Module map
 
-| Path | Module | Responsibility |
-|------|--------|----------------|
-| `services/gateway-api` | Control plane | HTTP API, auth, LiveKit admin, egress orchestration |
-| `packages/shared` | Shared contracts | Types, error codes, constants |
-| `deploy/compose` | Runtime package | One-command media plane for dev/prod-like |
-| `deploy/docker/*` | Image/config assets | LiveKit, Egress, edge proxy configs |
-| `scripts` | Tooling | smoke tests, keygen, bootstrap |
-| `examples/clatters-integration` | Reference | How Clatters backend should call the Gateway |
-| `docs/*` | Product docs | Architecture, API, ops, ADRs |
+| Path | Responsibility |
+|------|----------------|
+| `services/gateway-api` | Agnostic HTTP control plane |
+| `packages/shared` | Shared types, error codes, profile ids |
+| `deploy/compose` | Packaged media plane |
+| `deploy/docker/*` | LiveKit / Egress config assets |
+| `examples/*` | Consumer-specific adapters (Clatters, generic) |
+| `docs/integration/consumers/*` | Per-app inventories |
 
-## 4. Trust boundaries
+## 4. Agnostic session model
+
+| Platform concept | Meaning | Consumer may map to |
+|------------------|---------|---------------------|
+| `sessionId` | Platform session id | Live show id, meeting id, … |
+| `roomName` | LiveKit room | e.g. Clatters `workspace-{id}` |
+| `externalId` | Caller’s primary entity id | workspaceId, eventId, … |
+| `metadata` | Opaque JSON | product-specific fields |
+| `egress job` | Capture/package job | Echo recording, HLS broadcast, RTMP |
+| `playback` | Resolved viewer endpoints | hlsUrl / realtimeUrl |
+
+## 5. Trust boundaries
 
 | Boundary | Rule |
 |----------|------|
-| Mobile / Web | LiveKit **participant** tokens only; never API secret |
-| Clatters backend | Gateway **service** credentials |
-| Gateway | Holds LiveKit API key/secret, storage credentials, CDN signing keys |
-| Public CDN | Read-only playback; signed URLs when lives are non-public |
+| End-user clients | Participant tokens only |
+| Consumer backend | Gateway service credentials |
+| Gateway | LiveKit keys, storage, webhook signing |
+| CDN | Read-only; signed URLs when private |
 
-## 5. Session model
+## 6. Profiles
 
-A Clatters **Live show** maps to:
+See [capability-profiles.md](capability-profiles.md). Deployments enable the situations they need without forking the codebase.
 
-| Concept | Implementation |
-|---------|----------------|
-| Show / live session | Gateway `Session` resource |
-| Media room | LiveKit `room` (name = session id or deterministic mapping) |
-| Host publish | LiveKit token with `canPublish` |
-| Co-host | LiveKit token with publish grants + Clatters role |
-| Mass audience | HLS `playbackUrl` (default); optional capped WebRTC subscribe |
-| Packaging | Egress job(s) attached to session |
+## 7. First consumer snapshot (Clatters)
 
-## 6. Request flows (summary)
+| Today | Platform path |
+|-------|----------------|
+| LiveKit Cloud URL + keys | Self-host LiveKit (same SDK) |
+| Room composite → MP4 → AWS S3 `live-echo/…` | Self-host Egress + S3-compatible template |
+| WebRTC audience | Profile `creator_live_webrtc` |
+| Future 10k cost control | Profile `hybrid_live` / `creator_live_hls` |
 
-### 6.1 Go live (host)
+## 8. Related documents
 
-1. Clatters backend → `POST /v1/sessions`  
-2. Gateway creates LiveKit room metadata + returns `sessionId`, `realtimeUrl`  
-3. Clatters backend → `POST /v1/sessions/{id}/tokens` (role=host)  
-4. Host client connects with LiveKit SDK  
-5. Clatters backend → `POST /v1/sessions/{id}/egress` (HLS and/or recording)  
-6. Gateway returns `playbackUrl` when playlist is ready  
-
-### 6.2 Watch (audience)
-
-1. Clatters backend fetches session playback info (or Gateway public playback endpoint with authz)  
-2. Audience player loads **HLS** from CDN  
-3. Chat/gifts stay on existing Clatters real-time channels  
-
-### 6.3 End live
-
-1. `POST /v1/sessions/{id}/end`  
-2. Gateway stops egress, closes room, finalizes assets  
-
-## 7. Compatibility with current Clatters (managed)
-
-| Today (typical Cloud) | Target (this platform) |
-|-----------------------|-------------------------|
-| `wss://*.livekit.cloud` | `wss://realtime.<your-domain>` (self-host LiveKit) |
-| Cloud API key/secret | Same key model on self-host; held by Gateway |
-| Cloud Egress | Self-host Egress workers + your storage |
-| Cloud bandwidth bill | Your VPS bandwidth + CDN bill |
-
-Client SDK code paths should remain **LiveKit**; orchestration should move to **Gateway** if not already centralized.
-
-## 8. Non-functional targets
-
-| Area | Target |
-|------|--------|
-| Stage latency | Sub-second WebRTC |
-| Audience latency | ~2–8 s LL-HLS (configurable) |
-| Single-show passive viewers | Design for **10,000** via CDN |
-| Cutover | Feature-flag dual-run with rollback &lt; minutes |
-| Deploy shape | Compose package first; K8s optional later |
-
-## 9. Related documents
-
-- Cost and hybrid rationale: [self-hosted-cost-optimized-live-streaming-proposal.md](self-hosted-cost-optimized-live-streaming-proposal.md)  
-- API: [../api/gateway-api-v1.md](../api/gateway-api-v1.md)  
-- Integration: [../integration/clatters-migration-guide.md](../integration/clatters-migration-guide.md)  
-- Ops: [../operations/deployment-overview.md](../operations/deployment-overview.md)  
+- [capability-profiles.md](capability-profiles.md)  
+- [../api/gateway-api-v1.md](../api/gateway-api-v1.md)  
+- [../integration/generic-integration-guide.md](../integration/generic-integration-guide.md)  
+- [../roadmap/00-start-here.md](../roadmap/00-start-here.md)  

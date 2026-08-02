@@ -54,24 +54,35 @@ This is the **plug surface** for Clatters. Media clients use LiveKit SDKs with t
 
 ### Create session
 
+App-agnostic: pass your own ids in `externalId` / `metadata`. Optionally set `roomName` to match an existing LiveKit naming scheme (e.g. Clatters `workspace-{id}`).
+
 ```http
 POST /v1/sessions
 Content-Type: application/json
 Authorization: Bearer <service_key>
 
 {
-  "idempotencyKey": "clatters-live-abc123",
+  "idempotencyKey": "app-event-abc123",
+  "externalId": "workspace-or-event-id",
+  "roomName": "workspace-abc123",
   "metadata": {
-    "clattersLiveId": "abc123",
-    "hostUserId": "user_9"
+    "hostUserId": "user_9",
+    "product": "any-string-your-app-needs"
   },
+  "profile": "creator_live_webrtc",
   "realtime": {
     "emptyTimeoutSeconds": 300,
     "maxParticipants": 50
   },
   "audience": {
-    "mode": "hls",
+    "mode": "realtime",
     "visibility": "public"
+  },
+  "recording": {
+    "file": {
+      "enabled": true,
+      "keyTemplate": "{externalId}/{sessionId}-{time}.mp4"
+    }
   }
 }
 ```
@@ -79,8 +90,10 @@ Authorization: Bearer <service_key>
 ```json
 {
   "sessionId": "sess_01H...",
-  "roomName": "sess_01H...",
+  "externalId": "workspace-or-event-id",
+  "roomName": "workspace-abc123",
   "status": "ready",
+  "profile": "creator_live_webrtc",
   "realtime": {
     "url": "wss://realtime.media.example.com"
   },
@@ -125,7 +138,23 @@ Roles (Gateway-normalized):
 }
 ```
 
-### Start egress (HLS audience path)
+### Start egress
+
+**File recording** (Clatters Echo-compatible pattern: room composite → MP4 → object storage):
+
+```http
+POST /v1/sessions/sess_01H.../egress
+
+{
+  "type": "room_composite_file",
+  "options": {
+    "fileType": "mp4",
+    "filepath": "live-echo/{externalId}/{sessionId}-{time}.mp4"
+  }
+}
+```
+
+**HLS audience / archive** (large-scale profile):
 
 ```http
 POST /v1/sessions/sess_01H.../egress
@@ -140,17 +169,7 @@ POST /v1/sessions/sess_01H.../egress
 }
 ```
 
-```json
-{
-  "egressId": "eg_01H...",
-  "status": "starting",
-  "playback": {
-    "hlsUrl": "https://cdn.example.com/live/sess_01H.../index.m3u8"
-  }
-}
-```
-
-Exact egress type names will align with what Clatters uses today (room composite, track, participant) during migration discovery.
+Supported types (profile-gated): `room_composite_file`, `room_composite_hls`, `room_composite_rtmp`, `track`, `participant`.
 
 ---
 

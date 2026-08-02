@@ -14,9 +14,17 @@ export type ParticipantRole =
   | "realtime_viewer"
   | "agent";
 
+export type CapabilityProfile =
+  | "interactive"
+  | "creator_live_webrtc"
+  | "creator_live_hls"
+  | "hybrid_live"
+  | "recording_only"
+  | "live_plus_recording";
+
 export type EgressType =
+  | "room_composite_file"
   | "room_composite_hls"
-  | "room_composite_mp4"
   | "room_composite_rtmp"
   | "track"
   | "participant";
