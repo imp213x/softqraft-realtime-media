@@ -83,10 +83,20 @@ export async function registerEgressRoutes(
         // {time} left for LiveKit substitution when present
       });
 
-      const info = await startRoomCompositeFile(clients, config, {
-        roomName: session.roomName,
-        filepath,
-      });
+      let info;
+      try {
+        info = await startRoomCompositeFile(clients, config, {
+          roomName: session.roomName,
+          filepath,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new HttpError(
+          502,
+          ERROR_CODES.DEPENDENCY,
+          `Egress start failed: ${message}`,
+        );
+      }
 
       const egressId = String(info.egressId || "").trim();
       if (!egressId) {

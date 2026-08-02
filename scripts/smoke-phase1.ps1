@@ -14,13 +14,17 @@ $headers = @{
 }
 
 function Invoke-Json {
-  param([string]$Method, [string]$Url, [string]$Body = $null)
-  if ($null -ne $Body) {
+  param(
+    [string]$Method,
+    [string]$Url,
+    [string]$Body
+  )
+  $authOnly = @{ Authorization = "Bearer $ApiKey" }
+  if ($PSBoundParameters.ContainsKey("Body")) {
     return Invoke-RestMethod -Uri $Url -Method $Method -Headers $headers -Body $Body
   }
-  # Fastify rejects Content-Type: application/json with an empty body
-  $getHeaders = @{ Authorization = "Bearer $ApiKey" }
-  return Invoke-RestMethod -Uri $Url -Method $Method -Headers $getHeaders
+  # No body: omit Content-Type (Fastify rejects empty JSON bodies)
+  return Invoke-RestMethod -Uri $Url -Method $Method -Headers $authOnly
 }
 
 Write-Host "== health =="
