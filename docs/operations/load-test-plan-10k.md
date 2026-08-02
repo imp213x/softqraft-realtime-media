@@ -1,6 +1,6 @@
 # Load-test plan — ~10k passive viewers (Phase 3e)
 
-**Status:** Plan only (not automated yet)  
+**Status:** L0 verified locally (2026-08-02); L1–L3 pending real origin/CDN  
 **Goal:** Prove hybrid WebRTC stage + HLS/CDN audience can serve ~10k passive viewers without LiveKit Cloud.
 
 ## Architecture under test
@@ -27,15 +27,17 @@ Hosts/guests (≤ tens) ──WebRTC──► LiveKit SFU + coturn
 
 ## Phases
 
-### L0 — Lab baseline (local / single VM)
+### L0 — Lab baseline (local / single VM) ✅
 
-| Metric | Target |
-|--------|--------|
-| 1 host publish | Stable 720p30 |
-| 1 HLS egress | `live.m3u8` updates ≤ ~segment duration |
-| 5–20 local hls.js players | Continuous play ≥ 10 min |
-| SFU CPU | Headroom for stage only |
+| Metric | Target | Result (2026-08-02) |
+|--------|--------|---------------------|
+| 1 host publish | Stable 720p30 | ✅ |
+| 1 HLS egress | `live.m3u8` updates ≤ ~segment duration | ✅ MinIO `hls/local-dev/…` |
+| HLS player | Continuous play ≥ 10 min | ✅ **11+ min stable** (`hls_viewer`) |
+| WebRTC stage | realtime_viewer stable | ✅ |
+| SFU CPU | Headroom for stage only | ✅ (lab) |
 
+**Unblocked by:** MinIO anonymous download for lab HLS (`ensure-minio-hls-public.ps1`).  
 **Commands:** [local-live-test.md](local-live-test.md), `smoke-phase3.ps1`.
 
 ### L1 — Origin capacity (no CDN)

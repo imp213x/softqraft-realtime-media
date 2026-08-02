@@ -82,7 +82,10 @@ Remaining Phase 3:
 
 - [x] Audience player (hls.js) in `examples/local-live-test`  
 - [x] Load-test plan doc ([load-test-plan-10k.md](../operations/load-test-plan-10k.md))  
-- [ ] Execute L1–L3 load tests on real CDN/origin  
+- [x] **L0 lab baseline** — host + HLS + `hls_viewer` stable **11+ min** (2026-08-02)  
+- [ ] **L1** origin capacity (public S3/R2/MinIO, no CDN)  
+- [ ] **L2** CDN ramp (1k→10k, edge HIT%)  
+- [ ] **L3** soak + failure drills  
 - [ ] Production origin + CDN cutover for a real show  
 
 ---
