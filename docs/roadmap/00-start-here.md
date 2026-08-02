@@ -1,84 +1,69 @@
-# Where we start
+# Where we are
 
-**Product:** **SoftQraft Realtime Media** (SoftQraft Labs Ltd.) — app-agnostic self-hosted LiveKit + Egress + HTTP Gateway.  
-**First consumer:** Clatters / The_Scholar — inventory only; platform APIs stay generic.  
-**Recording:** Echo/file output remains on **AWS S3** initially ([ADR-006](../decisions/ADR-006-echo-recording-storage-aws.md)).
+**Product:** SoftQraft Realtime Media (SoftQraft Labs Ltd.)  
+**Current phase:** **Phase 2 — dual-run readiness (in progress)**  
+**Phase 1:** ✅ Complete (local publish + Echo recording verified 2026-08-02)
+
+Full matrix: [phased-delivery.md](phased-delivery.md)
+
+---
+
+## Phase snapshot
+
+| Phase | Status |
+|------:|--------|
+| 0 Foundation | ✅ |
+| **1 Media plane** | **✅ Done** — LiveKit + Egress + local MinIO Echo |
+| **2 Dual-run / Gateway** | **🔄 In progress** — code + docs ready; Clatters staging cutover pending |
+| 3 HLS/CDN 10k | ⏳ |
+| 4 Production cutover | ⏳ |
+| 5 Harden | ⏳ |
 
 ---
 
 ## Principles
 
 1. **Agnostic first** — sessions/rooms/egress/playback; no Nest/Echo types in core.  
-2. **Profiles for situations** — interactive, creator live WebRTC, HLS broadcast, recording, hybrid.  
+2. **Profiles for situations** — interactive, creator live, HLS, recording, hybrid.  
 3. **Drop-in for LiveKit apps** — same SDKs; URL + keys + optional Gateway.  
-4. **Egress is core** — file recording and later HLS; not an afterthought.  
-5. **Cost path for scale** — HLS/CDN profile when audiences grow (Clatters 10k goal).
+4. **Egress is core** — file recording proven locally; AWS S3 for Clatters Echo (ADR-006).  
+5. **Cost path for scale** — HLS/CDN profile when audiences grow (Phase 3).
 
 ---
 
-## What we learned from The_Scholar (summary)
+## What Phase 1 proved
 
-Full detail: [../integration/consumers/the-scholar-clatters-inventory.md](../integration/consumers/the-scholar-clatters-inventory.md)
+- Self-hosted SFU + Egress without LiveKit Cloud  
+- Host + viewer WebRTC (after LAN `node_ip` fix)  
+- Room composite MP4 to **local MinIO** (`sqrm-recordings`)  
+- Gateway orchestration (sessions, tokens, egress)
 
-| Area | Production today |
-|------|------------------|
-| Realtime | LiveKit **Cloud**, rooms `workspace-{id}` |
-| Audience | **WebRTC** subscribe (not HLS) |
-| Egress | **Room composite → MP4 → AWS S3** `live-echo/…` (Echo replay) |
-| Webhooks | App `/api/livekit/egress-webhook`, verify with API key/secret |
-| Stack | Node backend, Next.js + RN LiveKit clients |
-| S3 region | eu-west-2 (affinity hint for EU origin) |
+Runbooks:
 
-So the **fastest relief** for Clatters is self-host realtime + egress with **file output compatibility**, while the **scale/cost** win for 10k is a separate **HLS profile** any consumer can enable.
+- [../operations/phase-1-runbook.md](../operations/phase-1-runbook.md)  
+- [../operations/local-live-test.md](../operations/local-live-test.md)  
 
 ---
 
-## Start order
+## Phase 2 — what “done” means
 
-### Step 0 — Foundation ✅
+Close Phase 2 when:
 
-Docs, ADRs, OpenAPI, monorepo skeleton, SoftQraft branding.
+1. SoftQraft can write Echo to **AWS S3** with Clatters key template `live-echo/…`  
+2. Clatters **staging** points `LIVEKIT_*` at SoftQraft  
+3. Webhooks reach Clatters Echo finalize (direct or `WEBHOOK_FORWARD_URLS`)  
+4. Staging checklist signed (host / stage guest / viewer / replay)
 
-### Step 1 — Media plane parity ✅ (implemented; operator smoke pending)
-
-Self-host **LiveKit + Redis + Egress** + Gateway:
-
-- Tokens via Gateway (`livekit-server-sdk`)  
-- `room_composite_file` egress → S3-compatible (MinIO local; **AWS S3 for Echo**)  
-- Compose package + `scripts/smoke-phase1.ps1`  
-- Runbook: [../operations/phase-1-runbook.md](../operations/phase-1-runbook.md)  
-
-**Success:** Operator runs smoke with Docker Desktop up; optional publish → MP4 in bucket.
-
-### Step 2 — Dual-run readiness ✅ (in progress / implemented)
-
-- LiveKit → Gateway webhook verify (`POST /v1/webhooks/livekit`)  
-- Optional `WEBHOOK_FORWARD_URLS` fan-out to consumer apps (Clatters Echo)  
-- Clatters dual-run env + role mapping examples  
-- Runbook: [../operations/phase-2-dual-run.md](../operations/phase-2-dual-run.md)  
-
-### Step 3 — HLS / CDN profile
-
-Optional mass-audience path; does not break file-recording consumers.
-
-### Step 4 — Consumer cutover
-
-- Clatters staging dual-run → % production  
-- Keep Cloud rollback window  
-
-### Step 5 — Harden
-
-Multi-node, quotas, multi-tenant keys, load tests, TURN for mobile NAT.
+Tracking: [../operations/phase-2-checklist.md](../operations/phase-2-checklist.md)  
+Runbook: [../operations/phase-2-dual-run.md](../operations/phase-2-dual-run.md)
 
 ---
 
-## Immediate next engineering slice
+## Next work (in order)
 
-1. Wire LiveKit access token signing in Gateway (agnostic roles).  
-2. Enable Egress in Compose with S3-compatible output (MinIO locally).  
-3. Implement `room_composite_file` egress via Gateway.  
-4. Smoke: session → publish → egress → object exists.  
-5. Document Clatters env mapping (`LIVEKIT_URL` → self-host) without forking core.
+1. **AWS S3 Echo profile** for dual-run (env + compose notes)  
+2. **Clatters staging** dual-run  
+3. Optional: HLS profile (Phase 3) once dual-run is stable  
 
 ---
 
@@ -86,10 +71,5 @@ Multi-node, quotas, multi-tenant keys, load tests, TURN for mobile NAT.
 
 | Decision | Choice |
 |----------|--------|
-| Echo / recording object storage | **AWS S3** for first cutover; migrate later ([ADR-006](../decisions/ADR-006-echo-recording-storage-aws.md)) |
-| Open-source identity | **SoftQraft Labs Ltd.** / `@softqraft/*` ([ADR-007](../decisions/ADR-007-softqraft-open-source-identity.md)) |
-
-## Remaining deployment choices
-
-1. First production origin region (suggest **EU** near `eu-west-2` for S3 affinity)?  
-2. Single-node vs small multi-node for first staging dual-run?
+| Echo / recording object storage | **AWS S3** for consumer cutover; MinIO for local dev ([ADR-006](../decisions/ADR-006-echo-recording-storage-aws.md)) |
+| Open-source identity | SoftQraft Labs Ltd. / `@softqraft/*` ([ADR-007](../decisions/ADR-007-softqraft-open-source-identity.md)) |

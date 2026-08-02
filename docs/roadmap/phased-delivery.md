@@ -1,51 +1,89 @@
 # Phased delivery
 
-| Phase | Name | Outcome | Exit criteria |
-|------:|------|---------|---------------|
-| **0** | Foundation | Docs, monorepo, API contract, ADRs | Team aligned; OpenAPI v0 reviewed |
-| **1** | Media plane parity | Self-hosted LiveKit + Redis + TURN + Egress | Local/single-VM smoke: publish + egress |
-| **2** | Gateway product | HTTP API for shows, tokens, egress, playback | Clatters can integrate via HTTP only |
-| **3** | Audience scale | HLS/LL-HLS + CDN for passive viewers | Proven path toward 10k CDN viewers |
-| **4** | Production cutover | Clatters dual-run then primary on self-host | Rollback tested; cost metrics green |
-| **5** | Harden & scale | Multi-node, ABR, ops maturity | Multi-show capacity targets met |
+**Last updated:** 2026-08-02  
+**Current phase:** **Phase 2 — dual-run readiness (in progress)**  
+**Phase 1:** ✅ Complete (local operator verification)
 
-## Phase 0 — Foundation (current)
+| Phase | Name | Status | Exit criteria |
+|------:|------|--------|---------------|
+| **0** | Foundation | ✅ Done | Docs, monorepo, ADRs, OpenAPI |
+| **1** | Media plane parity | ✅ Done | Self-host LiveKit + Egress; publish + MP4 recording |
+| **2** | Gateway product + dual-run | 🔄 In progress | Consumer can dual-run / integrate via Gateway; staging path ready |
+| **3** | Audience scale | ⏳ Not started | HLS/LL-HLS + CDN path toward 10k viewers |
+| **4** | Production cutover | ⏳ Not started | Clatters primary on self-host; rollback tested |
+| **5** | Harden & scale | ⏳ Not started | Multi-node, SLOs, multi-show capacity |
+
+---
+
+## Phase 0 — Foundation ✅
 
 - Professional documentation tree  
-- Modular monorepo skeleton  
-- ADR-001 product positioning, ADR-002 hybrid delivery  
-- OpenAPI v0 for Gateway  
+- Modular monorepo (`@softqraft/*`)  
+- ADR-001 … ADR-007  
+- OpenAPI Gateway contract  
+- SoftQraft Labs Ltd. MIT identity  
 
-## Phase 1 — Media plane parity
+---
 
-- `deploy/compose` production-shaped stack  
-- LiveKit config, Redis, Egress workers, TURN  
-- Secrets and env templates  
-- Scripted smoke tests  
+## Phase 1 — Media plane parity ✅
 
-## Phase 2 — Gateway product
+**Verified 2026-08-02 (local Docker Desktop):**
 
-- `services/gateway-api` modular service  
-- Auth (service keys), rate limits, audit logs  
-- Token minting, room/show lifecycle, egress job control  
-- Playback URL assembly (realtime + HLS)  
+| Check | Result |
+|-------|--------|
+| Compose: LiveKit, Redis, Egress, MinIO, Gateway | Up |
+| Host publish + viewer subscribe | Worked |
+| WebRTC ICE (LAN `node_ip`) | Worked |
+| Room composite Echo → MinIO | Worked (~42 MiB MP4) |
+| Example object | `recordings/local-dev/sess_…-2026-08-02T164804.mp4` |
 
-## Phase 3 — Audience scale
+Deliverables:
 
-- Egress HLS to R2/Hetzner object storage (or origin)  
-- CDN configuration templates  
+- `deploy/compose` stack  
+- Gateway tokens + `room_composite_file` egress  
+- Local live test UI (`examples/local-live-test`)  
+- Smoke scripts + Phase 1 runbook  
+
+---
+
+## Phase 2 — Gateway product + dual-run 🔄
+
+### Done
+
+- Gateway sessions / tokens / egress / playback stub  
+- Service API key auth  
+- LiveKit webhook receive + optional `WEBHOOK_FORWARD_URLS`  
+- Clatters inventory + dual-run env / role-mapping examples  
+- Phase 2 dual-run runbook  
+
+### Remaining to close Phase 2
+
+- [ ] Clatters **staging** dual-run (env → SoftQraft; Echo → AWS S3)  
+- [ ] SoftQraft Egress/Gateway env for **AWS S3** Echo path (not only MinIO)  
+- [ ] Staging soak: host / guest / viewer / Echo finalize webhook  
+- [ ] Lightweight ops: egress status poll UX, dual-run checklist sign-off  
+- [ ] (Optional) Gateway rate limit + request audit log  
+
+---
+
+## Phase 3 — Audience scale ⏳
+
+- HLS / LL-HLS egress + CDN  
 - Audience player contract  
-- Load-test harness plan  
+- Load-test plan toward 10k passive viewers  
 
-## Phase 4 — Clatters cutover
+---
 
-- Feature-flagged endpoint swap  
-- Migration checklist  
-- Dual-write/dual-run period  
-- Incident rollback procedure  
+## Phase 4 — Production cutover ⏳
 
-## Phase 5 — Harden
+- Feature-flagged Clatters cutover  
+- Rollback to LiveKit Cloud  
+- Cost / QoS metrics  
 
-- Horizontal LiveKit + Egress pools  
-- Multi-region CDN (origin stays simple longer)  
-- SLO dashboards, capacity planning  
+---
+
+## Phase 5 — Harden ⏳
+
+- Multi-node LiveKit + Egress pool  
+- TURN for harsh NAT  
+- SLOs, capacity planning  

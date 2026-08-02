@@ -1,5 +1,7 @@
 # Example: Clatters / The_Scholar consumer
 
+**Phase:** SoftQraft Phase 1 ✅ · Phase 2 dual-run 🔄 (see [phase-2-checklist.md](../../docs/operations/phase-2-checklist.md))
+
 SoftQraft Realtime Media is **app-agnostic**. This folder only documents how **Clatters** plugs in.
 
 | Doc | Purpose |

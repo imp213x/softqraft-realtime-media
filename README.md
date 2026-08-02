@@ -13,6 +13,19 @@ Replace managed LiveKit Cloud for realtime cost control. Keep client LiveKit SDK
 
 **License:** MIT · **Packages:** `@softqraft/*`
 
+### Delivery status
+
+| Phase | Status |
+|------:|--------|
+| 0 Foundation | ✅ |
+| **1 Media plane parity** | **✅ Complete** (local live + Echo to MinIO verified) |
+| **2 Gateway + dual-run** | **🔄 In progress** — platform ready; Clatters staging dual-run next |
+| 3 HLS/CDN (10k audience) | ⏳ |
+| 4 Production cutover | ⏳ |
+| 5 Harden | ⏳ |
+
+See [docs/roadmap/phased-delivery.md](docs/roadmap/phased-delivery.md) and [docs/operations/phase-2-checklist.md](docs/operations/phase-2-checklist.md).
+
 ---
 
 ## Start here
@@ -47,7 +60,7 @@ Replace managed LiveKit Cloud for realtime cost control. Keep client LiveKit SDK
 | Traffic | Where |
 |---------|--------|
 | WebRTC realtime | Self-hosted SFU (not LiveKit Cloud; not AWS as primary media egress) |
-| Recording / Echo MP4 | **AWS S3** (existing consumer buckets) — move later if desired |
+| Recording / Echo MP4 | **Local:** MinIO · **Clatters cutover:** AWS S3 (ADR-006) |
 | Future HLS audience | CDN + S3-compatible segment storage (pluggable) |
 
 ---
@@ -90,7 +103,8 @@ pnpm dev:gateway
 ```
 
 Full operator steps: [docs/operations/phase-1-runbook.md](docs/operations/phase-1-runbook.md)  
-Dual-run / Clatters: [docs/operations/phase-2-dual-run.md](docs/operations/phase-2-dual-run.md)
+Dual-run / Clatters: [docs/operations/phase-2-dual-run.md](docs/operations/phase-2-dual-run.md)  
+Phase 2 checklist: [docs/operations/phase-2-checklist.md](docs/operations/phase-2-checklist.md)
 
 ---
 

@@ -1,5 +1,7 @@
 # Phase 1 runbook — SoftQraft Realtime Media
 
+**Phase 1 status: ✅ Complete** (local verification 2026-08-02: publish + Echo MP4 to MinIO).
+
 Bring up self-hosted **LiveKit + Redis + Egress + MinIO (local)** and the **Gateway API**.
 
 ## Prerequisites
@@ -123,5 +125,8 @@ Webhook: configure LiveKit to call the app’s existing egress webhook URL.
 - [x] Compose stack defined (LiveKit, Redis, Egress, MinIO, Gateway)  
 - [x] Gateway mints LiveKit tokens  
 - [x] Gateway starts/stops `room_composite_file` egress  
-- [x] S3-compatible output (MinIO local; AWS for Echo)  
-- [ ] Operator has run smoke successfully on their machine (Docker required)  
+- [x] S3-compatible output (MinIO local; AWS for Echo cutover)  
+- [x] Operator smoke + host/viewer live  
+- [x] Echo MP4 in MinIO (`recordings/local-dev/…`, ~42 MiB sample)  
+
+**Next:** [phase-2-checklist.md](phase-2-checklist.md)

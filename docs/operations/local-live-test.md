@@ -84,7 +84,7 @@ List files:
 2. With **Auto-start Echo** checked (default), recording starts ~1.5s after publish.  
    Or click **Start Echo egress (MP4 → MinIO)** manually.  
 3. Stay on camera **15–30 seconds** (empty rooms produce no useful file).  
-4. Click **Stop Echo (finalize MP4)** (or Leave — it stops Echo first).  
+4. Click **Stop Echo (finalize MP4)** — UI polls until **`complete`** (often 10–30s). Leave also stops Echo first.  
 5. Open MinIO → bucket `sqrm-recordings` → `recordings/local-dev/`.  
 6. **Viewer (optional):** new tab, `role=realtime_viewer` + `sessionId=…` → **Join existing session**.
 

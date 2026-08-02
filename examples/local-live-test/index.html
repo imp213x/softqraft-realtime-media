@@ -421,18 +421,54 @@
         }
       }
 
+      async function waitForEgressTerminal(id, { timeoutMs = 120000 } = {}) {
+        const started = Date.now();
+        let last = "stopping";
+        while (Date.now() - started < timeoutMs) {
+          try {
+            const job = await api(`/v1/egress/${id}`);
+            last = job.status || last;
+            setEcho(`echo: ${last} · ${id}`);
+            if (last === "complete" || last === "failed") {
+              return job;
+            }
+          } catch (err) {
+            log(`egress poll: ${err.message || err}`);
+          }
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+        return { egressId: id, status: last, error: "poll_timeout" };
+      }
+
       async function stopEgress() {
         if (!egressId) return;
+        const id = egressId;
         try {
           setEcho("echo: stopping…");
-          const job = await api(`/v1/egress/${egressId}/stop`, {
-            method: "POST",
-            body: {},
-          });
-          setEcho(`echo: ${job.status || "stopped"}`);
-          log(`egress stopped ${egressId} status=${job.status}`);
-          log("Check MinIO console → sqrm-recordings → recordings/local-dev/");
+          log(`stopping egress ${id} (finalize can take 10–30s)…`);
+          try {
+            await api(`/v1/egress/${id}/stop`, {
+              method: "POST",
+              body: {},
+            });
+          } catch (err) {
+            // Already aborted/complete is OK — still poll
+            log(`stop call: ${err.message || err}`);
+          }
+          const job = await waitForEgressTerminal(id);
+          const status = job.status || "unknown";
+          setEcho(`echo: ${status} · ${id}`);
+          log(`egress ${id} final status=${status}`);
+          if (status === "complete") {
+            log(
+              "Recording ready → MinIO sqrm-recordings / recordings/local-dev/",
+            );
+            log("Open http://localhost:9001 (softqraft / softqraftsecret)");
+          } else if (job.error) {
+            log(`egress error detail: ${job.error}`);
+          }
           el("btnStopEgress").disabled = true;
+          return job;
         } catch (err) {
           log(`stop egress error: ${err.message || err}`);
           alert(err.message || String(err));

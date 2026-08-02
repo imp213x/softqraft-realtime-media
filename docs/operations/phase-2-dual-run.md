@@ -1,6 +1,10 @@
 # Phase 2 — Dual-run & Clatters cutover
 
-SoftQraft Realtime Media is up (Phase 1). This phase connects a **consumer app** (Clatters first) without rewriting clients.
+**Phase status:** 🔄 In progress (platform ready for staging; Clatters dual-run pending)  
+**Checklist:** [phase-2-checklist.md](phase-2-checklist.md)
+
+SoftQraft Realtime Media Phase 1 is verified locally (live + Echo to MinIO).  
+Phase 2 connects a **consumer app** (Clatters first) without rewriting clients.
 
 ## Architecture for dual-run
 
@@ -14,25 +18,23 @@ LiveKit webhook   ──► Gateway /v1/webhooks/livekit
 
 ## SoftQraft side
 
-1. Stack running (`docker compose up -d`).  
-2. Production: TLS for `wss://realtime…` and `https://gateway…`.  
-3. Env for Echo on AWS:
+1. Stack running (Compose or VMs) with public `wss` + media ports.  
+2. Use **AWS Echo env** (not MinIO) for staging dual-run:  
+   [../../deploy/env/aws-echo.env.example](../../deploy/env/aws-echo.env.example)  
+3. `RECORDING_KEY_TEMPLATE=live-echo/{externalId}/{sessionId}-{time}.mp4`  
+4. `WEBHOOK_FORWARD_URLS=https://<clatters-host>/api/livekit/egress-webhook`  
+5. LiveKit webhooks → Gateway (`livekit.yaml`).
 
-```bash
-S3_BUCKET_NAME=thescholar-uploads
-AWS_REGION=eu-west-2
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
-# no S3_ENDPOINT for real AWS
-RECORDING_KEY_TEMPLATE=live-echo/{externalId}/{sessionId}-{time}.mp4
-WEBHOOK_FORWARD_URLS=https://<clatters-host>/api/livekit/egress-webhook
-```
+### Local vs staging storage
 
-4. LiveKit `webhook.urls` already points at Gateway in Compose (`livekit.yaml`).
+| Environment | Object storage |
+|-------------|----------------|
+| Local dev | MinIO `sqrm-recordings` / `recordings/…` |
+| Clatters dual-run / prod cutover | **AWS S3** `live-echo/…` (ADR-006) |
 
 ## Clatters side (minimal)
 
-Set on Clatters process only (see `examples/clatters-integration/env.dual-run.example`):
+See [../../examples/clatters-integration/env.dual-run.example](../../examples/clatters-integration/env.dual-run.example).
 
 | Variable | Self-host value |
 |----------|-----------------|
@@ -43,15 +45,14 @@ Set on Clatters process only (see `examples/clatters-integration/env.dual-run.ex
 
 **No mobile SDK change** if URL/token flow stays server-driven.
 
-## Cutover checklist
+## Cutover checklist (summary)
 
-- [ ] Staging Clatters → SoftQraft  
-- [ ] Host go-live + viewer join (WebRTC)  
-- [ ] Stage guest publish  
-- [ ] Echo: egress start after host publish; webhook finalize; playable MP4 on S3  
-- [ ] Background/reconnect soak  
-- [ ] Feature-flag % production traffic  
-- [ ] Keep Cloud credentials for rollback window  
+Use the full [phase-2-checklist.md](phase-2-checklist.md). Minimum path:
+
+1. Staging SoftQraft + AWS Echo write test  
+2. Clatters staging `LIVEKIT_*` → SoftQraft  
+3. Host live + viewer + Echo replay  
+4. Rollback drill to Cloud  
 
 ## Rollback
 
@@ -59,21 +60,12 @@ Set on Clatters process only (see `examples/clatters-integration/env.dual-run.ex
 2. Cloud Egress + Cloud webhooks as before.  
 3. In-flight SoftQraft rooms may need manual end.
 
-## Optional: Gateway as orchestration
-
-Later, Clatters can call SoftQraft Gateway for sessions/tokens/egress instead of `livekit-server-sdk` directly. Role map: `examples/clatters-integration/role-mapping.md`.
-
 ## Local verify (no Clatters)
 
 ```powershell
 cd C:\Dev\live-streaming-platform
-docker compose -f deploy/compose/docker-compose.yml up -d --build gateway
-docker compose -f deploy/compose/docker-compose.yml up -d livekit
-.\scripts\smoke-phase1.ps1
-```
-
-Webhook path (from inside Compose network):
-
-```text
-POST http://gateway:8080/v1/webhooks/livekit
+.\scripts\sync-livekit-node-ip.ps1
+docker compose -f deploy/compose/docker-compose.yml up -d
+.\scripts\start-local-live.ps1
+.\scripts\list-local-recordings.ps1
 ```
