@@ -24,8 +24,8 @@ services:
       retries: 10
 
   livekit:
-    # Keep in sync with Clatters livekit-client (2.x needs /rtc/v1; pin 1.9+)
-    image: livekit/livekit-server:v1.9.2
+    # Clatters livekit-client 2.19 expects /rtc/v1 (protocol 17). Use recent server.
+    image: livekit/livekit-server:v1.13.5
     restart: unless-stopped
     depends_on:
       redis:
