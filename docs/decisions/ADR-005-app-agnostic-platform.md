@@ -15,15 +15,17 @@ Build this repository as an **application-agnostic realtime media platform**:
 3. **Consumers** (Clatters, future apps) integrate via HTTP Gateway + LiveKit-compatible realtime, with optional adapters/examples only.  
 4. Clatters appears under `docs/integration/consumers/` and `examples/` as a **reference consumer**, not as the product name of the stack.
 
-## Product name (working)
+## Product name
+
+Superseded by **[ADR-007](ADR-007-softqraft-open-source-identity.md)**:
 
 | Layer | Name |
 |-------|------|
-| Repository / product | **Realtime Media Platform** (package scope `@rtm/*` or keep `@clatters-media/*` until rename pass) |
+| Organization | SoftQraft Labs Ltd. |
+| Product | **SoftQraft Realtime Media** |
+| Package scope | `@softqraft/*` |
 | Deployable stack | Self-hosted LiveKit plane + Gateway |
-| First consumer | Clatters / The_Scholar |
-
-A package rename from `@clatters-media/*` → neutral scope (e.g. `@rtmedia/*`) is allowed in a dedicated chore once foundation stabilizes.
+| First consumer | Clatters / The_Scholar (example only) |
 
 ## Capability profiles (meet every situation)
 

@@ -16,7 +16,7 @@ importers:
 
   services/gateway-api:
     dependencies:
-      '@clatters-media/shared':
+      '@softqraft/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       fastify:

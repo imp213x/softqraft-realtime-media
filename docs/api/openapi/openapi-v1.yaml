@@ -1,11 +1,12 @@
 openapi: 3.1.0
 info:
-  title: Realtime Media Platform Gateway API
+  title: SoftQraft Realtime Media Gateway API
   version: 1.0.0
   description: |
-    Application-agnostic HTTP control plane for self-hosted LiveKit + Egress.
+    SoftQraft Labs Ltd. — application-agnostic HTTP control plane for self-hosted LiveKit + Egress.
     Any backend integrates here; media clients use LiveKit SDKs with minted tokens.
     Capability profiles gate interactive, creator-live, HLS broadcast, and recording features.
+    Recording file output may target AWS S3 (initial Echo posture); storage remains pluggable.
 servers:
   - url: https://gateway.media.example.com
     description: Production (example)

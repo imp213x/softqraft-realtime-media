@@ -1,7 +1,9 @@
 {
-  "name": "@clatters-media/shared",
+  "name": "@softqraft/shared",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "author": "SoftQraft Labs Ltd.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

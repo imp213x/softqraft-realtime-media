@@ -1,5 +1,13 @@
 # Deployment overview
 
+**Product:** SoftQraft Realtime Media (SoftQraft Labs Ltd.)
+
+## Storage note
+
+- **Realtime:** self-hosted LiveKit (cheap-bandwidth hosts).  
+- **Recording/Echo files:** **AWS S3** for initial production ([ADR-006](../decisions/ADR-006-echo-recording-storage-aws.md)).  
+- Egress workers need network path and credentials to write to that bucket.
+
 ## Package form factors
 
 | Form | Path | Use |

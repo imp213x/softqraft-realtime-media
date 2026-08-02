@@ -1,11 +1,12 @@
 # Gateway API v1 (design)
 
+**Product:** SoftQraft Realtime Media (SoftQraft Labs Ltd.)  
 **Base path:** `/v1`  
 **Style:** JSON over HTTPS  
-**Auth:** `Authorization: Bearer <service_api_key>` (Clatters backend only)  
+**Auth:** `Authorization: Bearer <service_api_key>` (consumer backends only)  
 **Source of truth (machine):** [openapi/openapi-v1.yaml](openapi/openapi-v1.yaml)
 
-This is the **plug surface** for Clatters. Media clients use LiveKit SDKs with tokens issued here.
+This is the **plug surface** for any consumer app. Media clients use LiveKit SDKs with tokens issued here.
 
 ---
 

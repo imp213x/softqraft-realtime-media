@@ -1,12 +1,13 @@
 # Documentation index
 
-**Realtime Media Platform** — self-hosted, app-agnostic live/realtime media (LiveKit + Egress + HTTP Gateway).
+**SoftQraft Realtime Media** — SoftQraft Labs Ltd.  
+Self-hosted, app-agnostic live/realtime media (LiveKit + Egress + HTTP Gateway).
 
 | Section | Purpose |
 |---------|---------|
 | [architecture/](architecture/) | System design, capability profiles, cost model |
 | [api/](api/) | Gateway HTTP contract + OpenAPI |
-| [integration/](integration/) | Generic plug-in guide + per-consumer inventories |
+| [integration/](integration/) | Generic plug-in + per-consumer inventories |
 | [operations/](operations/) | Deploy and runbooks |
 | [decisions/](decisions/) | ADRs |
 | [roadmap/](roadmap/) | Phases and start-here |
@@ -20,5 +21,6 @@
 | [architecture/system-overview.md](architecture/system-overview.md) | Active architecture |
 | [architecture/capability-profiles.md](architecture/capability-profiles.md) | Situation matrix |
 | [integration/generic-integration-guide.md](integration/generic-integration-guide.md) | Any-app integration |
-| [integration/consumers/the-scholar-clatters-inventory.md](integration/consumers/the-scholar-clatters-inventory.md) | Clatters inventory from production repo |
-| [decisions/ADR-005-app-agnostic-platform.md](decisions/ADR-005-app-agnostic-platform.md) | Agnostic product decision |
+| [integration/consumers/the-scholar-clatters-inventory.md](integration/consumers/the-scholar-clatters-inventory.md) | Clatters consumer inventory |
+| [decisions/ADR-006-echo-recording-storage-aws.md](decisions/ADR-006-echo-recording-storage-aws.md) | Echo on AWS S3 (initial) |
+| [decisions/ADR-007-softqraft-open-source-identity.md](decisions/ADR-007-softqraft-open-source-identity.md) | SoftQraft open-source identity |

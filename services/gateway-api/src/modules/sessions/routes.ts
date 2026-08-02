@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { GatewayConfig } from "../../config.js";
 import { requireServiceAuth, HttpError } from "../../lib/auth.js";
 import { sendError } from "../../lib/errors.js";
-import { ERROR_CODES } from "@clatters-media/shared";
+import { ERROR_CODES } from "@softqraft/shared";
 import { SessionStore } from "./store.js";
 
 const createSessionBody = z.object({

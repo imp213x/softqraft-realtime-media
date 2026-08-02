@@ -1,6 +1,6 @@
 import type { FastifyRequest } from "fastify";
 import type { GatewayConfig } from "../config.js";
-import { ERROR_CODES } from "@clatters-media/shared";
+import { ERROR_CODES } from "@softqraft/shared";
 
 export class HttpError extends Error {
   constructor(

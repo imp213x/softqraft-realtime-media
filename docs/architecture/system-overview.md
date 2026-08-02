@@ -1,18 +1,21 @@
-# System overview — Realtime Media Platform
+# System overview — SoftQraft Realtime Media
 
 **Status:** Active  
-**Related:** [ADR-001](../decisions/ADR-001-self-hosted-livekit-drop-in.md) … [ADR-005](../decisions/ADR-005-app-agnostic-platform.md), [capability-profiles.md](capability-profiles.md)
+**Owner:** SoftQraft Labs Ltd.  
+**Related:** [ADR-001](../decisions/ADR-001-self-hosted-livekit-drop-in.md) … [ADR-007](../decisions/ADR-007-softqraft-open-source-identity.md), [capability-profiles.md](capability-profiles.md)
 
 ## 1. Product definition
 
-This repository is an **application-agnostic, self-hosted realtime media platform**:
+**SoftQraft Realtime Media** is an **application-agnostic, self-hosted realtime media platform**:
 
 1. **Deployable media plane** — LiveKit Server, Redis, TURN, Egress  
 2. **HTTP Gateway API** — sessions, tokens, egress, playback, webhooks  
 3. **Delivery options** — WebRTC stage/audience and/or HLS/CDN, selected by **capability profiles**
 
 Any app (Clatters, white-label live, meetings, webinars) plugs in via API/HTTP + LiveKit SDKs.  
-**Clatters / The_Scholar** is the first production consumer inventory, not the product identity.
+**Clatters / The_Scholar** is a consumer inventory, not the product identity.
+
+**Recording posture:** Echo-style room-composite **files stay on AWS S3** for the first cutover ([ADR-006](../decisions/ADR-006-echo-recording-storage-aws.md)); realtime plane is self-hosted.
 
 See consumer inventory: [../integration/consumers/the-scholar-clatters-inventory.md](../integration/consumers/the-scholar-clatters-inventory.md).
 

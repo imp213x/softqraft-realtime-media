@@ -1,13 +1,17 @@
-# Realtime Media Platform
+# SoftQraft Realtime Media
 
-Self-hosted, **application-agnostic** live and realtime media stack:
+**SoftQraft Labs Ltd.** — self-hosted, **application-agnostic** realtime and live media platform.
 
-1. **Media plane** — LiveKit Server, Redis, TURN, Egress  
-2. **HTTP Gateway** — sessions, tokens, egress, playback (any backend plugs in)  
-3. **Capability profiles** — interactive calls, creator live (WebRTC or HLS), recording, hybrid  
+| Layer | What it is |
+|-------|------------|
+| Media plane | LiveKit Server, Redis, TURN, Egress |
+| Control plane | HTTP Gateway (sessions, tokens, egress, playback) |
+| Profiles | Interactive, creator live (WebRTC/HLS), recording, hybrid |
 
-Replace managed LiveKit Cloud (and expensive SFU fan-out) without rewriting client SDKs.  
-**Clatters / The_Scholar** is a supported consumer, not the product identity.
+Replace managed LiveKit Cloud for realtime cost control. Keep client LiveKit SDKs.  
+**Clatters** and other apps integrate as consumers — they are not the product name.
+
+**License:** MIT · **Packages:** `@softqraft/*`
 
 ---
 
@@ -17,37 +21,48 @@ Replace managed LiveKit Cloud (and expensive SFU fan-out) without rewriting clie
 |-----|---------|
 | **[docs/roadmap/00-start-here.md](docs/roadmap/00-start-here.md)** | Build order |
 | [docs/architecture/system-overview.md](docs/architecture/system-overview.md) | System design |
-| [docs/architecture/capability-profiles.md](docs/architecture/capability-profiles.md) | Situations the platform covers |
+| [docs/architecture/capability-profiles.md](docs/architecture/capability-profiles.md) | Situations covered |
 | [docs/api/gateway-api-v1.md](docs/api/gateway-api-v1.md) | HTTP contract |
 | [docs/integration/generic-integration-guide.md](docs/integration/generic-integration-guide.md) | Plug in any app |
-| [docs/integration/consumers/the-scholar-clatters-inventory.md](docs/integration/consumers/the-scholar-clatters-inventory.md) | Clatters production inventory |
+| [docs/integration/consumers/the-scholar-clatters-inventory.md](docs/integration/consumers/the-scholar-clatters-inventory.md) | Clatters inventory |
+| [docs/decisions/ADR-006-echo-recording-storage-aws.md](docs/decisions/ADR-006-echo-recording-storage-aws.md) | Echo stays on AWS S3 (for now) |
+| [docs/decisions/ADR-007-softqraft-open-source-identity.md](docs/decisions/ADR-007-softqraft-open-source-identity.md) | Branding & open-source identity |
 | [docs/README.md](docs/README.md) | Full index |
 
 ---
 
-## Situations covered (profiles)
+## Capability profiles
 
 | Profile | Use when |
 |---------|----------|
-| `interactive` | Meetings / small collaborative rooms |
-| `creator_live_webrtc` | Instagram-style live, audience on WebRTC |
-| `creator_live_hls` | Large audience via HLS + CDN (cost control) |
-| `hybrid_live` | Stage WebRTC + crowd HLS (+ optional VIP WebRTC) |
-| `recording_only` | Room composite / track → object storage |
-| `live_plus_recording` | Live + Echo/VOD style capture |
+| `interactive` | Meetings / small rooms |
+| `creator_live_webrtc` | Creator live, audience on WebRTC |
+| `creator_live_hls` / `hybrid_live` | Large audience via HLS + CDN |
+| `recording_only` / `live_plus_recording` | File/VOD capture (e.g. Echo-style) |
+
+---
+
+## Storage posture (current)
+
+| Traffic | Where |
+|---------|--------|
+| WebRTC realtime | Self-hosted SFU (not LiveKit Cloud; not AWS as primary media egress) |
+| Recording / Echo MP4 | **AWS S3** (existing consumer buckets) — move later if desired |
+| Future HLS audience | CDN + S3-compatible segment storage (pluggable) |
 
 ---
 
 ## Repository layout
 
 ```text
-live-streaming-platform/
-├── docs/                 # architecture, api, integration, ops, ADRs, roadmap
-├── services/gateway-api/ # agnostic HTTP control plane
-├── packages/shared/
-├── deploy/               # compose + LiveKit/Egress configs
+live-streaming-platform/   # working directory name; product = SoftQraft Realtime Media
+├── docs/
+├── services/gateway-api/  # @softqraft/gateway-api
+├── packages/shared/       # @softqraft/shared
+├── deploy/
 ├── scripts/
-└── examples/             # consumer-specific adapters only
+├── examples/              # consumer adapters only
+└── LICENSE                # MIT © SoftQraft Labs Ltd.
 ```
 
 ---
@@ -56,7 +71,7 @@ live-streaming-platform/
 
 ```bash
 pnpm install
-pnpm --filter @clatters-media/shared build
+pnpm --filter @softqraft/shared build
 pnpm dev:gateway
 ```
 
@@ -64,30 +79,13 @@ pnpm dev:gateway
 .\scripts\smoke-gateway.ps1
 ```
 
-Media plane:
-
 ```bash
 cd deploy/compose
 docker compose up -d
 ```
 
-> Package scope `@clatters-media/*` is temporary; rename to a neutral scope is tracked in ADR-005.
-
 ---
 
-## First consumer: Clatters (summary)
+## Copyright
 
-From [The_Scholar](https://github.com/imp213x/The_Scholar):
-
-- LiveKit **Cloud** today; rooms `workspace-{id}`  
-- Audience: **WebRTC** subscribe  
-- Egress: **room composite MP4 → S3** `live-echo/…` (Echo)  
-- Webhooks to app for egress completion  
-
-Platform goal: self-host parity + optional HLS profile for 10k-scale cost control, without baking Nest/Echo into core APIs.
-
----
-
-## License
-
-To be decided.
+Copyright (c) 2026 SoftQraft Labs Ltd. Licensed under the [MIT License](LICENSE).

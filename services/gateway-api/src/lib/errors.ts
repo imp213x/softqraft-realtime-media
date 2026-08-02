@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { ERROR_CODES, type ApiErrorBody } from "@clatters-media/shared";
+import { ERROR_CODES, type ApiErrorBody } from "@softqraft/shared";
 import { HttpError } from "./auth.js";
 
 export function sendError(

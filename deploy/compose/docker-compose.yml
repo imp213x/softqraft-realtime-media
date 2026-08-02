@@ -1,11 +1,12 @@
-# Clatters Media Platform — local / single-node media plane
+# SoftQraft Realtime Media — local / single-node media plane
 # Usage:
 #   cp ../env/media.env.example .env
 #   docker compose up -d
 #
 # Phase 1 target: LiveKit + Redis + Egress (+ optional gateway later in this compose)
+# Recording/Echo file output: AWS S3 (see ADR-006); realtime plane is self-hosted.
 
-name: clatters-media
+name: softqraft-realtime-media
 
 services:
   redis:

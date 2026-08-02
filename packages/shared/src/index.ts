@@ -1,5 +1,5 @@
 /**
- * Shared contracts for Clatters Media Platform.
+ * Shared contracts for SoftQraft Realtime Media.
  * Keep this package free of runtime side effects.
  */
 

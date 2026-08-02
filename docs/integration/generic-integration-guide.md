@@ -1,6 +1,6 @@
 # Generic integration guide
 
-How **any application** plugs into the Realtime Media Platform without adopting Clatters domain models.
+How **any application** plugs into **SoftQraft Realtime Media** without adopting Clatters domain models.
 
 ## Integration surfaces
 

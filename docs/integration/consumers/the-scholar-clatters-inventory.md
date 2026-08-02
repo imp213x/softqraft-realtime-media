@@ -116,9 +116,10 @@ Code: `server/services/livekitEgressService.js`.
 ## 6. Migration notes (Clatters-specific)
 
 1. **Minimal cutover:** Self-host LiveKit + Egress with Cloud-compatible API; keep app token/egress code; only env + webhook target change.  
-2. **Storage:** Can keep AWS S3 for Echo initially (app already depends on it) while moving **realtime bandwidth** off Cloud — still a large win. Later move Echo to R2/Hetzner if desired.  
+2. **Storage (decided):** **Keep Echo on AWS S3** for first cutover ([ADR-006](../../decisions/ADR-006-echo-recording-storage-aws.md)). Move object storage later if desired. Realtime plane still leaves LiveKit Cloud.  
 3. **Cost at 10k:** Requires product change to route audience to HLS (or hard-cap WebRTC viewers). Platform must support that without assuming Clatters naming.  
-4. **Do not** force Clatters room names inside the platform — accept caller-supplied `roomName` / external ids.
+4. **Do not** force Clatters room names inside the platform — accept caller-supplied `roomName` / external ids.  
+5. **Platform product name:** SoftQraft Realtime Media (`@softqraft/*`) — Clatters remains a consumer only.
 
 ---
 

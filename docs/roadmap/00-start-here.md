@@ -1,7 +1,8 @@
 # Where we start
 
-**Product:** Application-agnostic **Realtime Media Platform** (self-hosted LiveKit + Egress + HTTP Gateway).  
-**First consumer:** Clatters / The_Scholar — inventory only; platform APIs stay generic.
+**Product:** **SoftQraft Realtime Media** (SoftQraft Labs Ltd.) — app-agnostic self-hosted LiveKit + Egress + HTTP Gateway.  
+**First consumer:** Clatters / The_Scholar — inventory only; platform APIs stay generic.  
+**Recording:** Echo/file output remains on **AWS S3** initially ([ADR-006](../decisions/ADR-006-echo-recording-storage-aws.md)).
 
 ---
 
@@ -81,10 +82,14 @@ Multi-node, quotas, multi-tenant keys, load tests.
 
 ---
 
-## Open questions (no longer blocked on Clatters inventory)
+## Resolved product decisions
 
-Inventory is done. Remaining choices are **deployment**, not product discovery:
+| Decision | Choice |
+|----------|--------|
+| Echo / recording object storage | **AWS S3** for first cutover; migrate later ([ADR-006](../decisions/ADR-006-echo-recording-storage-aws.md)) |
+| Open-source identity | **SoftQraft Labs Ltd.** / `@softqraft/*` ([ADR-007](../decisions/ADR-007-softqraft-open-source-identity.md)) |
 
-1. First production origin region (suggest **EU** near `eu-west-2` users/S3)?  
-2. Keep Echo on **AWS S3** initially vs move to R2/Hetzner in the same cutover?  
-3. Package scope rename now (`@clatters-media` → neutral) or after Phase 1?
+## Remaining deployment choices
+
+1. First production origin region (suggest **EU** near `eu-west-2` for S3 affinity)?  
+2. Single-node vs small multi-node for first staging dual-run?

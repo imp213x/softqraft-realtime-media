@@ -1,6 +1,8 @@
 # Clatters migration guide
 
-Migrate production Clatters Live from **managed LiveKit Cloud + Egress** to this **self-hosted Realtime Media Platform** with minimal risk.
+Migrate production Clatters Live from **managed LiveKit Cloud + Egress** to **SoftQraft Realtime Media** (self-hosted) with minimal risk.
+
+**Recording:** Echo files remain on **AWS S3** for the first cutover ([ADR-006](../decisions/ADR-006-echo-recording-storage-aws.md)).
 
 > Platform core is **app-agnostic**. This guide is consumer-specific.  
 > Inventory: [consumers/the-scholar-clatters-inventory.md](consumers/the-scholar-clatters-inventory.md)  
