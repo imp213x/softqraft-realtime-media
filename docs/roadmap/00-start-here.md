@@ -37,17 +37,18 @@ So the **fastest relief** for Clatters is self-host realtime + egress with **fil
 
 ### Step 0 — Foundation ✅
 
-Docs, ADRs (incl. agnostic ADR-005), OpenAPI, monorepo skeleton, Compose bootstrap.
+Docs, ADRs, OpenAPI, monorepo skeleton, SoftQraft branding.
 
-### Step 1 — Media plane parity (next)
+### Step 1 — Media plane parity ✅ (implemented; operator smoke pending)
 
-Self-host **LiveKit + Redis + TURN + Egress** such that:
+Self-host **LiveKit + Redis + Egress** + Gateway:
 
-- Any client can publish/subscribe with standard LiveKit tokens  
-- Room composite **file** egress writes to **S3-compatible** storage  
-- Webhooks can reach a consumer URL  
+- Tokens via Gateway (`livekit-server-sdk`)  
+- `room_composite_file` egress → S3-compatible (MinIO local; **AWS S3 for Echo**)  
+- Compose package + `scripts/smoke-phase1.ps1`  
+- Runbook: [../operations/phase-1-runbook.md](../operations/phase-1-runbook.md)  
 
-**Success:** Demo app or smoke script records MP4 without LiveKit Cloud.
+**Success:** Operator runs smoke with Docker Desktop up; optional publish → MP4 in bucket.
 
 ### Step 2 — Agnostic Gateway productization
 

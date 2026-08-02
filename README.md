@@ -67,22 +67,29 @@ live-streaming-platform/   # working directory name; product = SoftQraft Realtim
 
 ---
 
-## Quick start (foundation)
+## Quick start (Phase 1)
 
-```bash
+```powershell
+# 1) Media plane (requires Docker Desktop)
+cd deploy\compose
+Copy-Item ..\env\media.env.example .env -ErrorAction SilentlyContinue
+docker compose up -d
+
+# 2) API smoke
+cd ..\..
+.\scripts\smoke-phase1.ps1
+```
+
+Gateway only (host process):
+
+```powershell
 pnpm install
 pnpm --filter @softqraft/shared build
+# set LIVEKIT_* and S3_* from deploy/env/media.env.example
 pnpm dev:gateway
 ```
 
-```powershell
-.\scripts\smoke-gateway.ps1
-```
-
-```bash
-cd deploy/compose
-docker compose up -d
-```
+Full operator steps: [docs/operations/phase-1-runbook.md](docs/operations/phase-1-runbook.md)
 
 ---
 

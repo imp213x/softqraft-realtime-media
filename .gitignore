@@ -15,6 +15,8 @@ desktop.ini
 .env.*
 !.env.example
 !deploy/env/*.env.example
+# Compose local env may contain secrets; example stays under deploy/env/
+deploy/compose/.env
 *.pem
 *.key
 

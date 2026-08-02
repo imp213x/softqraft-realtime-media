@@ -2,13 +2,28 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import type { GatewayConfig } from "../../config.js";
+import type { LiveKitClients } from "../../providers/livekit/client.js";
 import { requireServiceAuth, HttpError } from "../../lib/auth.js";
 import { sendError } from "../../lib/errors.js";
 import { ERROR_CODES } from "@softqraft/shared";
 import { SessionStore } from "./store.js";
+import { toPublicSession } from "./types.js";
+import { mintParticipantToken } from "../../providers/livekit/tokens.js";
 
 const createSessionBody = z.object({
   idempotencyKey: z.string().min(1).optional(),
+  externalId: z.string().min(1).max(128).optional(),
+  roomName: z.string().min(1).max(256).optional(),
+  profile: z
+    .enum([
+      "interactive",
+      "creator_live_webrtc",
+      "creator_live_hls",
+      "hybrid_live",
+      "recording_only",
+      "live_plus_recording",
+    ])
+    .optional(),
   metadata: z.record(z.unknown()).optional(),
   realtime: z
     .object({
@@ -22,26 +37,32 @@ const createSessionBody = z.object({
       visibility: z.enum(["public", "private"]).optional(),
     })
     .optional(),
+  recording: z
+    .object({
+      file: z
+        .object({
+          enabled: z.boolean().optional(),
+          keyTemplate: z.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 const createTokenBody = z.object({
-  identity: z.string().min(1),
-  name: z.string().optional(),
+  identity: z.string().min(1).max(128),
+  name: z.string().max(128).optional(),
   role: z.enum(["host", "cohost", "guest", "realtime_viewer", "agent"]),
   ttlSeconds: z.number().int().min(60).max(86400).optional(),
   attributes: z.record(z.string()).optional(),
 });
 
-/**
- * Session routes — Phase 0/1 skeleton.
- * Token minting and LiveKit RoomService wiring land in the next engineering slice.
- */
 export async function registerSessionRoutes(
   app: FastifyInstance,
   config: GatewayConfig,
+  clients: LiveKitClients,
+  store: SessionStore,
 ): Promise<void> {
-  const store = new SessionStore();
-
   app.post("/v1/sessions", async (req, reply) => {
     try {
       requireServiceAuth(req, config);
@@ -50,24 +71,57 @@ export async function registerSessionRoutes(
       if (body.idempotencyKey) {
         const existing = store.getByIdempotencyKey(body.idempotencyKey);
         if (existing) {
-          return reply.status(200).send(existing);
+          return reply.status(200).send(toPublicSession(existing));
         }
       }
 
       const sessionId = `sess_${randomUUID().replace(/-/g, "")}`;
+      const roomName = body.roomName?.trim() || sessionId;
+      const emptyTimeout = body.realtime?.emptyTimeoutSeconds ?? 300;
+      const maxParticipants = body.realtime?.maxParticipants ?? 50;
+
+      try {
+        await clients.rooms.createRoom({
+          name: roomName,
+          emptyTimeout,
+          maxParticipants,
+          metadata: JSON.stringify({
+            sessionId,
+            externalId: body.externalId ?? null,
+            ...(body.metadata ?? {}),
+          }),
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        // Room may already exist if caller reuses roomName — allow adopt
+        if (!/already exists|conflict|duplicat/i.test(message)) {
+          throw new HttpError(
+            503,
+            ERROR_CODES.DEPENDENCY,
+            `LiveKit createRoom failed: ${message}`,
+          );
+        }
+      }
+
       const session = store.create({
         sessionId,
-        roomName: sessionId,
+        externalId: body.externalId ?? null,
+        roomName,
         status: "ready",
+        profile: body.profile ?? "creator_live_webrtc",
+        audienceMode: body.audience?.mode ?? "realtime",
         realtime: { url: config.realtimeUrl },
         playback: { status: "pending", hlsUrl: null },
-        metadata: body.metadata ?? {},
+        metadata: {
+          ...(body.metadata ?? {}),
+          recording: body.recording ?? null,
+        },
         idempotencyKey: body.idempotencyKey,
         createdAt: new Date().toISOString(),
         endedAt: null,
       });
 
-      return reply.status(201).send(session);
+      return reply.status(201).send(toPublicSession(session));
     } catch (err) {
       if (err instanceof z.ZodError) {
         return sendError(
@@ -80,6 +134,18 @@ export async function registerSessionRoutes(
     }
   });
 
+  app.get("/v1/sessions", async (req, reply) => {
+    try {
+      requireServiceAuth(req, config);
+      const q = req.query as { status?: string; limit?: string };
+      const limit = Math.min(100, Math.max(1, Number(q.limit ?? 20) || 20));
+      const items = store.list(q.status, limit).map(toPublicSession);
+      return reply.send({ items });
+    } catch (err) {
+      return sendError(req, reply, err);
+    }
+  });
+
   app.get("/v1/sessions/:sessionId", async (req, reply) => {
     try {
       requireServiceAuth(req, config);
@@ -88,7 +154,7 @@ export async function registerSessionRoutes(
       if (!session) {
         throw new HttpError(404, ERROR_CODES.NOT_FOUND, "Session not found");
       }
-      return reply.send(session);
+      return reply.send(toPublicSession(session));
     } catch (err) {
       return sendError(req, reply, err);
     }
@@ -98,11 +164,35 @@ export async function registerSessionRoutes(
     try {
       requireServiceAuth(req, config);
       const { sessionId } = req.params as { sessionId: string };
-      const session = store.end(sessionId);
+      const session = store.get(sessionId);
       if (!session) {
         throw new HttpError(404, ERROR_CODES.NOT_FOUND, "Session not found");
       }
-      return reply.send(session);
+
+      // Best-effort stop active egress jobs
+      for (const job of store.listEgress(sessionId)) {
+        if (job.status === "starting" || job.status === "active") {
+          try {
+            await clients.egress.stopEgress(job.egressId);
+            store.putEgress({
+              ...job,
+              status: "stopping",
+              updatedAt: new Date().toISOString(),
+            });
+          } catch (err) {
+            req.log.warn({ err, egressId: job.egressId }, "stop egress failed");
+          }
+        }
+      }
+
+      try {
+        await clients.rooms.deleteRoom(session.roomName);
+      } catch (err) {
+        req.log.warn({ err, room: session.roomName }, "deleteRoom failed");
+      }
+
+      const ended = store.end(sessionId)!;
+      return reply.send(toPublicSession(ended));
     } catch (err) {
       return sendError(req, reply, err);
     }
@@ -118,21 +208,20 @@ export async function registerSessionRoutes(
       }
       const body = createTokenBody.parse(req.body ?? {});
 
-      // Placeholder until LiveKit access-token signing is wired (next slice).
-      return reply.status(501).send({
-        error: {
-          code: "not_implemented",
-          message:
-            "Token minting will be enabled once LiveKit API credentials are wired",
-          requestId: req.requestId,
-          debug: {
-            sessionId,
-            identity: body.identity,
-            role: body.role,
-            realtimeUrl: config.realtimeUrl,
-          },
-        },
+      const minted = await mintParticipantToken(config, {
+        identity: body.identity,
+        name: body.name,
+        roomName: session.roomName,
+        role: body.role,
+        ttlSeconds: body.ttlSeconds,
+        attributes: body.attributes,
       });
+
+      if (session.status === "ready" && body.role === "host") {
+        store.update(sessionId, { status: "live" });
+      }
+
+      return reply.send(minted);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return sendError(
@@ -141,6 +230,31 @@ export async function registerSessionRoutes(
           new HttpError(400, ERROR_CODES.VALIDATION, err.message),
         );
       }
+      return sendError(req, reply, err);
+    }
+  });
+
+  app.get("/v1/sessions/:sessionId/playback", async (req, reply) => {
+    try {
+      requireServiceAuth(req, config);
+      const { sessionId } = req.params as { sessionId: string };
+      const session = store.get(sessionId);
+      if (!session) {
+        throw new HttpError(404, ERROR_CODES.NOT_FOUND, "Session not found");
+      }
+      return reply.send({
+        sessionId: session.sessionId,
+        audienceMode: session.audienceMode,
+        status:
+          session.status === "ended"
+            ? "ended"
+            : session.playback.status === "ready"
+              ? "ready"
+              : session.playback.status,
+        hlsUrl: session.playback.hlsUrl,
+        realtimeUrl: session.realtime.url,
+      });
+    } catch (err) {
       return sendError(req, reply, err);
     }
   });

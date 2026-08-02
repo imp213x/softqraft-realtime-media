@@ -1,24 +1,17 @@
-# LiveKit Egress worker config (template)
-# Docs: https://docs.livekit.io/home/self-hosting/egress/
+# SoftQraft Realtime Media — LiveKit Egress worker
+# Room composite file output (Echo-style MP4). Storage via env-driven S3 in requests
+# and/or defaults below for local MinIO.
 #
-# Fill API key/secret to match livekit.yaml keys.
-# Point storage at R2 / S3-compatible / local for HLS segments.
+# Keys must match livekit.yaml
 
-api_key: devkey
-api_secret: secret_replace_me_with_generate_keys_output
+log_level: info
+api_key: softqraft_dev_key
+api_secret: softqraft_dev_secret_change_me_before_prod
 ws_url: ws://livekit:7880
+
 redis:
   address: redis:6379
 
-# Example S3-compatible output (Cloudflare R2, Hetzner, MinIO, etc.)
-# Uncomment and configure for HLS audience path.
-# s3:
-#   access_key: ""
-#   secret: ""
-#   region: auto
-#   endpoint: https://<accountid>.r2.cloudflarestorage.com
-#   bucket: clatters-live-hls
-#   force_path_style: true
-
-logging:
-  level: info
+# Health / CPU limits can be tuned in production
+# cpu_cost:
+#   room_composite_cpu_cost: 3.0

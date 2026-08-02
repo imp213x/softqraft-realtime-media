@@ -1,10 +1,12 @@
 # SoftQraft Realtime Media — local / single-node media plane
+#
 # Usage:
-#   cp ../env/media.env.example .env
+#   cd deploy/compose
+#   copy ..\env\media.env.example .env   # PowerShell: Copy-Item
 #   docker compose up -d
 #
-# Phase 1 target: LiveKit + Redis + Egress (+ optional gateway later in this compose)
-# Recording/Echo file output: AWS S3 (see ADR-006); realtime plane is self-hosted.
+# Stack: Redis + LiveKit + Egress + MinIO (local S3 for recording smoke tests)
+# Production Echo: point Egress/Gateway at AWS S3 (ADR-006); MinIO is local-only.
 
 name: softqraft-realtime-media
 
@@ -22,7 +24,7 @@ services:
       retries: 10
 
   livekit:
-    image: livekit/livekit-server:latest
+    image: livekit/livekit-server:v1.8.4
     restart: unless-stopped
     depends_on:
       redis:
@@ -31,25 +33,92 @@ services:
     volumes:
       - ../docker/livekit/livekit.yaml:/etc/livekit.yaml:ro
     ports:
-      # HTTP / RTC over TCP (dev)
       - "7880:7880"
-      # RTC UDP (adjust range for production)
+      - "7881:7881"
       - "50000-50100:50000-50100/udp"
-    # Production: host networking or carefully mapped UDP + public IP announced in config
 
-  # Egress requires API keys matching LiveKit and Redis.
-  # Uncomment when keys and storage are configured (Phase 1).
-  # egress:
-  #   image: livekit/egress:latest
-  #   restart: unless-stopped
-  #   depends_on:
-  #     redis:
-  #       condition: service_healthy
-  #     livekit:
-  #       condition: service_started
-  #   environment:
-  #     EGRESS_CONFIG_FILE: /etc/egress.yaml
-  #   volumes:
-  #     - ../docker/egress/egress.yaml:/etc/egress.yaml:ro
-  #   # Chrome-based room composite needs substantial shared memory
-  #   shm_size: "2gb"
+  # Local S3-compatible storage for recording smoke tests.
+  # Production Echo stays on AWS S3 (set GATEWAY / egress request credentials).
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-softqraft}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-softqraftsecret}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  # Create default recording bucket on first boot
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set local http://minio:9000 $${MINIO_ROOT_USER:-softqraft} $${MINIO_ROOT_PASSWORD:-softqraftsecret};
+      mc mb -p local/$${S3_BUCKET_NAME:-sqrm-recordings} || true;
+      exit 0;
+      "
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-softqraft}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-softqraftsecret}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-sqrm-recordings}
+
+  egress:
+    image: livekit/egress:v1.9.0
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+      minio-init:
+        condition: service_started
+    environment:
+      EGRESS_CONFIG_FILE: /etc/egress.yaml
+    volumes:
+      - ../docker/egress/egress.yaml:/etc/egress.yaml:ro
+    # Room composite uses Chromium
+    shm_size: "2gb"
+    # Egress needs to reach LiveKit, Redis, and S3/MinIO on the compose network
+
+  # Optional: run Gateway in Compose (also runs via pnpm dev:gateway on host)
+  gateway:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/gateway/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      livekit:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      GATEWAY_HOST: 0.0.0.0
+      GATEWAY_PORT: 8080
+      GATEWAY_SERVICE_API_KEYS: ${GATEWAY_SERVICE_API_KEYS:-dev-local-key}
+      LIVEKIT_URL: ${LIVEKIT_URL:-http://livekit:7880}
+      LIVEKIT_REALTIME_URL: ${LIVEKIT_REALTIME_URL:-ws://localhost:7880}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-softqraft_dev_key}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-softqraft_dev_secret_change_me_before_prod}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-sqrm-recordings}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-softqraft}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-softqraftsecret}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      RECORDING_KEY_TEMPLATE: ${RECORDING_KEY_TEMPLATE:-recordings/{externalId}/{sessionId}-{time}.mp4}
+    ports:
+      - "8080:8080"
+
+volumes:
+  minio_data:

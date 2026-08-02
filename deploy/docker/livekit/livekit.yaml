@@ -1,21 +1,30 @@
-# Development LiveKit config — replace keys before any shared environment.
-# Generate keys: docker run --rm livekit/livekit-server generate-keys
+# SoftQraft Realtime Media — LiveKit server (dev/staging template)
+# Rotate keys before any shared or production environment.
+# Generate: docker run --rm livekit/livekit-server generate-keys
 
 port: 7880
+bind_addresses:
+  - ""
+
 rtc:
   tcp_port: 7881
   port_range_start: 50000
   port_range_end: 50100
-  # For local browser testing on the same machine, use_external_ip can be false.
-  # For remote clients, set true or set node_ip to your public address.
+  # Local browser on same machine: false. Remote clients / VMs: true or set node_ip.
   use_external_ip: false
+  # node_ip: 203.0.113.10
 
 redis:
   address: redis:6379
 
-# DEV ONLY — rotate before staging/production
+# Must match LIVEKIT_API_KEY / LIVEKIT_API_SECRET and Egress config
 keys:
-  devkey: secret_replace_me_with_generate_keys_output
+  softqraft_dev_key: softqraft_dev_secret_change_me_before_prod
 
 logging:
   level: info
+
+# Enable TURN in production with a public domain and TLS certs.
+# Local Compose smoke tests work without TURN for same-network clients.
+turn:
+  enabled: false
