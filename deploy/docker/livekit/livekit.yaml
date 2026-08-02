@@ -1,6 +1,9 @@
-# SoftQraft Realtime Media — LiveKit server (dev/staging template)
+# SoftQraft Realtime Media — LiveKit (local Docker Desktop friendly)
 # Rotate keys before any shared or production environment.
-# Generate: docker run --rm livekit/livekit-server generate-keys
+#
+# PC connection failures on local Docker usually mean the server advertised a
+# container IP (e.g. 172.19.x.x). For browser-on-same-machine, force node_ip
+# to 127.0.0.1 and publish the media ports below.
 
 port: 7880
 bind_addresses:
@@ -8,30 +11,27 @@ bind_addresses:
 
 rtc:
   tcp_port: 7881
-  # Avoid common Windows/app UDP ranges (50000+) that often conflict
-  port_range_start: 52000
-  port_range_end: 52100
-  # Local browser on same machine: false. Remote clients / VMs: true or set node_ip.
+  # Single UDP port is far more reliable through Docker Desktop NAT than a range
+  udp_port: 7882
+  # Advertise loopback so the host browser can ICE to published ports
   use_external_ip: false
-  # node_ip: 203.0.113.10
+  node_ip: 127.0.0.1
+  # Prefer STUN only when you set a real public/LAN node_ip for remote clients
+  # stun_servers: []
 
 redis:
   address: redis:6379
 
-# Must match LIVEKIT_API_KEY / LIVEKIT_API_SECRET and Egress config
 keys:
   softqraft_dev_key: softqraft_dev_secret_change_me_before_prod
 
 logging:
   level: info
 
-# Webhooks → SoftQraft Gateway (verify + optional fan-out to consumer apps)
 webhook:
   api_key: softqraft_dev_key
   urls:
     - http://gateway:8080/v1/webhooks/livekit
 
-# Enable TURN in production with a public domain and TLS certs.
-# Local Compose smoke tests work without TURN for same-network clients.
 turn:
   enabled: false

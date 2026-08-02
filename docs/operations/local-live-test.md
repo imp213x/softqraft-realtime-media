@@ -7,6 +7,25 @@ Run SoftQraft with **local env** and test a real Live session in the browser.
 - Docker Desktop running  
 - Camera/microphone permission in the browser  
 
+## WebRTC note (Docker Desktop)
+
+If the UI shows **`could not establish pc connection`**, LiveKit was advertising an
+unreachable Docker IP. Local config forces:
+
+```yaml
+rtc.node_ip: 127.0.0.1
+rtc.udp_port: 7882
+```
+
+Recreate LiveKit after config changes:
+
+```powershell
+docker compose -f deploy/compose/docker-compose.yml up -d --force-recreate livekit
+```
+
+For a **phone on the same Wi‑Fi**, set `node_ip` to your PC’s LAN IP (e.g. `192.168.1.20`)
+and open the test UI via that IP, not `localhost`.
+
 ## One command
 
 ```powershell

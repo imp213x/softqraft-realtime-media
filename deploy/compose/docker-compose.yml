@@ -35,7 +35,8 @@ services:
     ports:
       - "7880:7880"
       - "7881:7881"
-      - "52000-52100:52000-52100/udp"
+      # Single media UDP port (must match livekit.yaml rtc.udp_port)
+      - "7882:7882/udp"
 
   # Local S3-compatible storage for recording smoke tests.
   # Production Echo stays on AWS S3 (set GATEWAY / egress request credentials).
