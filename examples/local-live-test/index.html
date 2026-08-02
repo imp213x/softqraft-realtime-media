@@ -319,7 +319,8 @@
           log("published camera + microphone");
           // Wait briefly so Egress/Chrome sees tracks
           if (el("autoEcho").checked && sessionId) {
-            await new Promise((r) => setTimeout(r, 1500));
+            // Give WebRTC + Egress Chrome time before room composite
+            await new Promise((r) => setTimeout(r, 4000));
             await startEgress({ quiet: true });
           }
         }

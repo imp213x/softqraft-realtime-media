@@ -223,11 +223,76 @@ export async function registerEgressRoutes(
       const { egressId } = req.params as { egressId: string };
       const job = store.getEgress(egressId);
 
+      // Already terminal — treat as success (UI may call stop after auto-abort)
+      try {
+        const current = await getEgress(clients, egressId);
+        if (current) {
+          const status = mapEgressStatus(current);
+          if (
+            status === "complete" ||
+            status === "failed" ||
+            status === "stopping"
+          ) {
+            if (job) {
+              const updated = store.putEgress({
+                ...job,
+                status,
+                error:
+                  status === "failed"
+                    ? String(current.error || job.error || "egress_failed")
+                    : job.error,
+                updatedAt: new Date().toISOString(),
+              });
+              return reply.send(toPublicEgress(updated));
+            }
+            return reply.send({
+              egressId,
+              sessionId: null,
+              type: "room_composite_file",
+              status,
+              playback: { hlsUrl: null },
+              error: status === "failed" ? String(current.error || "") : null,
+              createdAt: null,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        }
+      } catch {
+        /* continue to stop */
+      }
+
       let info;
       try {
         info = await stopEgressJob(clients, egressId);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        // LiveKit rejects stop on ABORTED/COMPLETE — surface as terminal state
+        if (/ABORTED|COMPLETE|FAILED|cannot be stopped/i.test(message)) {
+          const status = /COMPLETE/i.test(message)
+            ? "complete"
+            : /FAILED/i.test(message)
+              ? "failed"
+              : "failed";
+          if (job) {
+            const updated = store.putEgress({
+              ...job,
+              status,
+              error: message,
+              updatedAt: new Date().toISOString(),
+            });
+            return reply.send(toPublicEgress(updated));
+          }
+          return reply.send({
+            egressId,
+            sessionId: null,
+            type: "room_composite_file",
+            status,
+            playback: { hlsUrl: null },
+            error: message,
+            createdAt: null,
+            updatedAt: new Date().toISOString(),
+          });
+        }
         throw new HttpError(
           502,
           ERROR_CODES.DEPENDENCY,

@@ -86,7 +86,9 @@ services:
       - ../docker/egress/egress.yaml:/etc/egress.yaml:ro
     # Room composite uses Chromium
     shm_size: "2gb"
-    # Egress needs to reach LiveKit, Redis, and S3/MinIO on the compose network
+    # Reach host-published LiveKit media ports when node_ip is the LAN IP
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   # Optional: run Gateway in Compose (also runs via pnpm dev:gateway on host)
   gateway:
