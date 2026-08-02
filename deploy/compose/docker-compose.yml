@@ -24,7 +24,8 @@ services:
       retries: 10
 
   livekit:
-    image: livekit/livekit-server:v1.8.4
+    # Keep in sync with Clatters livekit-client (2.x needs /rtc/v1; pin 1.9+)
+    image: livekit/livekit-server:v1.9.2
     restart: unless-stopped
     depends_on:
       redis:
@@ -71,7 +72,7 @@ services:
       S3_BUCKET_NAME: ${S3_BUCKET_NAME:-sqrm-recordings}
 
   egress:
-    image: livekit/egress:v1.9.0
+    image: livekit/egress:v1.9.1
     restart: unless-stopped
     depends_on:
       redis:
