@@ -14,8 +14,15 @@ desktop.ini
 .env
 .env.*
 !.env.example
+!deploy/env/*.env.example
 *.pem
 *.key
+
+# TypeScript / Node
+*.tsbuildinfo
+services/*/dist/
+packages/*/dist/
+.pnpm-store/
 
 # Dependencies / build
 node_modules/

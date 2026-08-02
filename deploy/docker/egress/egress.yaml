@@ -1,0 +1,24 @@
+# LiveKit Egress worker config (template)
+# Docs: https://docs.livekit.io/home/self-hosting/egress/
+#
+# Fill API key/secret to match livekit.yaml keys.
+# Point storage at R2 / S3-compatible / local for HLS segments.
+
+api_key: devkey
+api_secret: secret_replace_me_with_generate_keys_output
+ws_url: ws://livekit:7880
+redis:
+  address: redis:6379
+
+# Example S3-compatible output (Cloudflare R2, Hetzner, MinIO, etc.)
+# Uncomment and configure for HLS audience path.
+# s3:
+#   access_key: ""
+#   secret: ""
+#   region: auto
+#   endpoint: https://<accountid>.r2.cloudflarestorage.com
+#   bucket: clatters-live-hls
+#   force_path_style: true
+
+logging:
+  level: info

@@ -1,0 +1,17 @@
+{
+  "name": "clatters-media-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted LiveKit + Egress media platform with HTTP Gateway for Clatters",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r run build",
+    "dev:gateway": "pnpm --filter @clatters-media/gateway-api dev",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test"
+  }
+}

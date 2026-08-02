@@ -1,0 +1,54 @@
+# Clatters Media Platform — local / single-node media plane
+# Usage:
+#   cp ../env/media.env.example .env
+#   docker compose up -d
+#
+# Phase 1 target: LiveKit + Redis + Egress (+ optional gateway later in this compose)
+
+name: clatters-media
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  livekit:
+    image: livekit/livekit-server:latest
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ["--config", "/etc/livekit.yaml"]
+    volumes:
+      - ../docker/livekit/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      # HTTP / RTC over TCP (dev)
+      - "7880:7880"
+      # RTC UDP (adjust range for production)
+      - "50000-50100:50000-50100/udp"
+    # Production: host networking or carefully mapped UDP + public IP announced in config
+
+  # Egress requires API keys matching LiveKit and Redis.
+  # Uncomment when keys and storage are configured (Phase 1).
+  # egress:
+  #   image: livekit/egress:latest
+  #   restart: unless-stopped
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #     livekit:
+  #       condition: service_started
+  #   environment:
+  #     EGRESS_CONFIG_FILE: /etc/egress.yaml
+  #   volumes:
+  #     - ../docker/egress/egress.yaml:/etc/egress.yaml:ro
+  #   # Chrome-based room composite needs substantial shared memory
+  #   shm_size: "2gb"

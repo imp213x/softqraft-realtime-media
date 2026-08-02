@@ -1,0 +1,525 @@
+openapi: 3.1.0
+info:
+  title: Clatters Media Platform Gateway API
+  version: 1.0.0
+  description: |
+    HTTP control plane for self-hosted LiveKit + Egress.
+    Clatters backends integrate here; media clients use LiveKit SDKs with minted tokens.
+servers:
+  - url: https://gateway.media.example.com
+    description: Production (example)
+  - url: http://localhost:8080
+    description: Local development
+tags:
+  - name: Health
+  - name: Sessions
+  - name: Tokens
+  - name: Egress
+  - name: Playback
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      operationId: getHealth
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /ready:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      operationId: getReady
+      responses:
+        "200":
+          description: Dependencies reachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadyResponse"
+        "503":
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/sessions:
+    post:
+      tags: [Sessions]
+      summary: Create a live session
+      operationId: createSession
+      security:
+        - ServiceBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: Idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [Sessions]
+      summary: List sessions
+      operationId: listSessions
+      security:
+        - ServiceBearer: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ready, live, ending, ended]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Session list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/sessions/{sessionId}:
+    get:
+      tags: [Sessions]
+      summary: Get session
+      operationId: getSession
+      security:
+        - ServiceBearer: []
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/sessions/{sessionId}/end:
+    post:
+      tags: [Sessions]
+      summary: End session
+      operationId: endSession
+      security:
+        - ServiceBearer: []
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Session ended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/sessions/{sessionId}/tokens:
+    post:
+      tags: [Tokens]
+      summary: Mint participant token
+      operationId: createToken
+      security:
+        - ServiceBearer: []
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTokenRequest"
+      responses:
+        "200":
+          description: Token minted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/sessions/{sessionId}/egress:
+    post:
+      tags: [Egress]
+      summary: Start egress for session
+      operationId: startEgress
+      security:
+        - ServiceBearer: []
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartEgressRequest"
+      responses:
+        "202":
+          description: Egress accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EgressJob"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    get:
+      tags: [Egress]
+      summary: List egress jobs for session
+      operationId: listSessionEgress
+      security:
+        - ServiceBearer: []
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Egress jobs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EgressJobList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/egress/{egressId}:
+    get:
+      tags: [Egress]
+      summary: Get egress job
+      operationId: getEgress
+      security:
+        - ServiceBearer: []
+      parameters:
+        - $ref: "#/components/parameters/EgressId"
+      responses:
+        "200":
+          description: Egress job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EgressJob"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/egress/{egressId}/stop:
+    post:
+      tags: [Egress]
+      summary: Stop egress job
+      operationId: stopEgress
+      security:
+        - ServiceBearer: []
+      parameters:
+        - $ref: "#/components/parameters/EgressId"
+      responses:
+        "200":
+          description: Stop accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EgressJob"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/sessions/{sessionId}/playback:
+    get:
+      tags: [Playback]
+      summary: Resolve playback endpoints
+      operationId: getPlayback
+      security:
+        - ServiceBearer: []
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Playback info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaybackResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+components:
+  securitySchemes:
+    ServiceBearer:
+      type: http
+      scheme: bearer
+      description: Clatters backend service API key
+  parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+    EgressId:
+      name: egressId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    Unauthorized:
+      description: Missing or invalid service credentials
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+    ReadyResponse:
+      type: object
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
+        checks:
+          type: object
+          additionalProperties:
+            type: boolean
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, requestId]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            requestId:
+              type: string
+    CreateSessionRequest:
+      type: object
+      properties:
+        idempotencyKey:
+          type: string
+          description: Client-supplied key for safe retries
+        metadata:
+          type: object
+          additionalProperties: true
+        realtime:
+          type: object
+          properties:
+            emptyTimeoutSeconds:
+              type: integer
+              minimum: 0
+            maxParticipants:
+              type: integer
+              minimum: 1
+        audience:
+          type: object
+          properties:
+            mode:
+              type: string
+              enum: [hls, realtime, hybrid]
+              default: hls
+            visibility:
+              type: string
+              enum: [public, private]
+              default: public
+    Session:
+      type: object
+      required: [sessionId, roomName, status, realtime, createdAt]
+      properties:
+        sessionId:
+          type: string
+        roomName:
+          type: string
+        status:
+          type: string
+          enum: [ready, live, ending, ended]
+        realtime:
+          type: object
+          required: [url]
+          properties:
+            url:
+              type: string
+              format: uri
+        playback:
+          type: object
+          properties:
+            status:
+              type: string
+              enum: [pending, ready, unavailable]
+            hlsUrl:
+              type: string
+              format: uri
+              nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+    SessionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Session"
+    CreateTokenRequest:
+      type: object
+      required: [identity, role]
+      properties:
+        identity:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [host, cohost, guest, realtime_viewer, agent]
+        ttlSeconds:
+          type: integer
+          minimum: 60
+          maximum: 86400
+          default: 3600
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+    TokenResponse:
+      type: object
+      required: [token, identity, role, expiresAt, realtimeUrl]
+      properties:
+        token:
+          type: string
+        identity:
+          type: string
+        role:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        realtimeUrl:
+          type: string
+          format: uri
+    StartEgressRequest:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum:
+            - room_composite_hls
+            - room_composite_mp4
+            - room_composite_rtmp
+            - track
+            - participant
+          description: Align with Clatters production egress usage during migration
+        options:
+          type: object
+          additionalProperties: true
+    EgressJob:
+      type: object
+      required: [egressId, sessionId, type, status]
+      properties:
+        egressId:
+          type: string
+        sessionId:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+          enum: [starting, active, stopping, complete, failed]
+        playback:
+          type: object
+          properties:
+            hlsUrl:
+              type: string
+              format: uri
+              nullable: true
+        error:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    EgressJobList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EgressJob"
+    PlaybackResponse:
+      type: object
+      required: [sessionId, audienceMode, status]
+      properties:
+        sessionId:
+          type: string
+        audienceMode:
+          type: string
+          enum: [hls, realtime, hybrid]
+        status:
+          type: string
+          enum: [pending, ready, unavailable, ended]
+        hlsUrl:
+          type: string
+          format: uri
+          nullable: true
+        realtimeUrl:
+          type: string
+          format: uri
+          nullable: true
