@@ -1,8 +1,8 @@
 # Phased delivery
 
-**Last updated:** 2026-08-02  
-**Current phase:** **Phase 2 dual-run (in progress) + Phase 3a–d market-grade slice (implemented)**  
-**Phase 1:** ✅ Complete (local operator verification)
+**Last updated:** 2026-08-03  
+**Current phase:** **Public interactive SFU on GCP — hardening ladder**  
+**Phase 1:** ✅ Complete (local + public WebRTC host/viewer)
 
 | Phase | Name | Status | Exit criteria |
 |------:|------|--------|---------------|
@@ -90,9 +90,24 @@ Remaining Phase 3:
 
 ---
 
+## Public SFU hardening (no Echo / no HLS first) 🔄
+
+See [public-sfu-readiness.md](../operations/public-sfu-readiness.md).
+
+| # | Step | Status |
+|---|------|--------|
+| **H1** | `node_ip` = public VM IP | ⬜ next |
+| H2 | TLS + domain (`wss`) | ⬜ |
+| H3 | Public coturn | ⬜ |
+| H4 | Rotate secrets | ⬜ |
+| H5 | Firewall lockdown | ⬜ |
+| H6 | Static IP + monitoring | ⬜ |
+
+Echo / HLS / CDN remain deferred until interactive path is hardened.
+
 ## Phase 4 — Production cutover ⏳
 
-- Feature-flagged Clatters cutover  
+- Feature-flagged consumer cutover (first app e.g. Clatters)  
 - Rollback to LiveKit Cloud  
 - Cost / QoS metrics  
 
