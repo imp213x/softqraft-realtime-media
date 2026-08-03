@@ -35,8 +35,8 @@ App → Gateway :8080 → LiveKit :7880 + media UDP
 | H1 | LiveKit `node_ip` + `LIVEKIT_REALTIME_URL` = public IP | ✅ 2026-08-03 |
 | H2 | TLS + domain (`https` / `wss`) | ✅ media/realtime.softqraftlabs.com via Caddy |
 | H3 | Public coturn + `iceServers` | ✅ turn:34.60.190.142:3478 in gateway tokens |
-| H4 | Rotate API keys / secrets | ⬜ next |
-| H5 | Firewall lockdown (not wide open) | ⬜ |
+| H4 | Rotate API keys / secrets | ✅ operator rotated (2026-08-03) |
+| H5 | Firewall lockdown (not wide open) | ⬜ next |
 | H6 | Static IP + basic monitoring | ⬜ |
 | H7 | Session durability (optional Redis/DB) | ⬜ later |
 | H8 | HLS + R2/CDN | ⬜ when scale needed |
@@ -68,6 +68,27 @@ TURN_EXTERNAL_IP=34.60.190.142
 ```
 
 Gateway tokens must advertise `turn:34.60.190.142:3478`, not `127.0.0.1`.
+
+## H4 — secrets (done when)
+
+- New `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` in `.env` **and** `livekit.yaml` `keys:` (must match)
+- New `GATEWAY_SERVICE_API_KEYS` (UI uses this Bearer)
+- New `TURN_PASSWORD` (+ matching coturn user)
+- Recreate: `livekit`, `gateway`, `coturn`, `egress`
+- Never commit `.env`
+
+## H5 — firewall lockdown
+
+Keep public only what clients need:
+
+| Port | Keep public? |
+|------|----------------|
+| 80, 443 | Yes (Caddy TLS) |
+| 3478 tcp/udp, 49160-49200 udp | Yes (TURN) |
+| 7880-7881, 7882 | Prefer **no** if all traffic via Caddy `realtime.*` — test first |
+| 8080 | Prefer **no** if all via `media.*` |
+| 9000-9001, 6379 | **No** (MinIO/Redis internal) |
+| 22 | Your IP only |
 
 ## Ops facts
 
