@@ -276,7 +276,7 @@
       }
 
       async function api(path, { method = "GET", body } = {}) {
-        const base = el("gatewayUrl").value.replace(/\/$/, "");
+        const base = el("gatewayUrl").value.trim().replace(/\/$/, "");
         const res = await fetch(`${base}${path}`, {
           method,
           headers: {
