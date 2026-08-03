@@ -34,7 +34,7 @@ App → Gateway :8080 → LiveKit :7880 + media UDP
 |---|------|--------|
 | H1 | LiveKit `node_ip` + `LIVEKIT_REALTIME_URL` = public IP | ✅ 2026-08-03 |
 | H2 | TLS + domain (`https` / `wss`) | ✅ media/realtime.softqraftlabs.com via Caddy |
-| H3 | Public coturn + `iceServers` | ⬜ next |
+| H3 | Public coturn + `iceServers` | 🔄 in progress |
 | H4 | Rotate API keys / secrets | ⬜ |
 | H5 | Firewall lockdown (not wide open) | ⬜ |
 | H6 | Static IP + basic monitoring | ⬜ |
@@ -42,12 +42,40 @@ App → Gateway :8080 → LiveKit :7880 + media UDP
 | H8 | HLS + R2/CDN | ⬜ when scale needed |
 | H9 | Echo / recording | ⬜ deferred |
 
+## H3 — public coturn (GCP VM)
+
+```bash
+# SSH to VM, then:
+cd ~/softqraft-realtime-media/deploy/compose
+nano .env   # set TURN_* below
+
+# GCP firewall: tcp/udp 3478, udp 49160-49200
+
+docker compose --profile turn up -d
+docker compose up -d --force-recreate gateway
+docker compose logs --tail=5 gateway | grep iceServers
+```
+
+`.env` (example):
+```bash
+TURN_ENABLED=true
+TURN_HOST=34.60.190.142
+TURN_PORT=3478
+TURN_USERNAME=softqraft
+TURN_PASSWORD=softqraftturn
+TURN_REALM=softqraft.local
+TURN_EXTERNAL_IP=34.60.190.142
+```
+
+Gateway tokens must advertise `turn:34.60.190.142:3478`, not `127.0.0.1`.
+
 ## Ops facts
 
 - Gateway sessions are **in-memory** — restart loses session ids  
 - Host and all viewers must use the **same** Gateway base URL  
 - Local MinIO on VM ≠ R2; R2 is for later HLS origin  
 - Repo: `https://github.com/imp213x/softqraft-realtime-media` (or org remote)  
+- Public TLS: `https://media.softqraftlabs.com` / `wss://realtime.softqraftlabs.com`  
 
 ## Related
 
