@@ -32,7 +32,7 @@ App → Gateway :8080 → LiveKit :7880 + media UDP
 
 | # | Step | Status |
 |---|------|--------|
-| H1 | LiveKit `node_ip` = public IP | 🔄 set + LiveKit recreated — confirm with live test |
+| H1 | LiveKit `node_ip` + `LIVEKIT_REALTIME_URL` = public IP | ✅ 2026-08-03 |
 | H2 | TLS + domain (`https` / `wss`) | ⬜ |
 | H3 | Public coturn + `iceServers` | ⬜ |
 | H4 | Rotate API keys / secrets | ⬜ |
