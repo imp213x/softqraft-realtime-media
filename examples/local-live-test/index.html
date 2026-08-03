@@ -560,9 +560,40 @@
         }
       }
 
+      async function probeHlsUrl(src) {
+        try {
+          const res = await fetch(src, { method: "GET", mode: "cors", cache: "no-store" });
+          if (!res.ok) {
+            const body = (await res.text().catch(() => "")).slice(0, 200);
+            throw new Error(
+              `HLS playlist HTTP ${res.status} — ${body || res.statusText}. ` +
+                (res.status === 403
+                  ? "MinIO is private: run .\\scripts\\ensure-minio-hls-public.ps1"
+                  : "Check HLS_PUBLIC_BASE_URL and that egress is active."),
+            );
+          }
+          const text = await res.text();
+          if (!text.includes("#EXTM3U")) {
+            throw new Error("URL did not return an HLS playlist (#EXTM3U missing)");
+          }
+          log(`playlist probe OK (${text.length} bytes)`);
+          return true;
+        } catch (err) {
+          if (err.message?.includes("HTTP")) throw err;
+          throw new Error(
+            `Cannot fetch HLS playlist (CORS/network): ${err.message || err}. ` +
+              "For local MinIO run: .\\scripts\\ensure-minio-hls-public.ps1",
+          );
+        }
+      }
+
       async function playHls(url) {
         const src = url || el("hlsUrl").value;
         if (!src) throw new Error("No HLS URL");
+        log(`HLS load ${src}`);
+        setStatus("hls probing…");
+        await probeHlsUrl(src);
+
         clearStage();
         const tile = document.createElement("div");
         tile.className = "tile";
@@ -583,24 +614,40 @@
           hlsPlayer = new Hls({
             lowLatencyMode: true,
             liveSyncDurationCount: 3,
+            enableWorker: true,
           });
           hlsPlayer.loadSource(src);
           hlsPlayer.attachMedia(video);
           hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
             video.play().catch(() => {});
-            log("HLS manifest parsed — playing");
+            log("HLS manifest parsed - playing");
+            setStatus("hls playing");
           });
           hlsPlayer.on(Hls.Events.ERROR, (_e, data) => {
-            log(`hls.js error: ${data?.type} ${data?.details || ""}`);
+            const detail = data?.details || "";
+            const code = data?.response?.code;
+            log(
+              `hls.js error: ${data?.type} ${detail}` +
+                (code ? ` http=${code}` : "") +
+                (data?.fatal ? " FATAL" : ""),
+            );
+            if (data?.fatal) {
+              setStatus("hls error");
+              if (code === 403 || detail.includes("manifestLoadError")) {
+                log(
+                  "Hint: MinIO denied read. Run .\\scripts\\ensure-minio-hls-public.ps1 then Play HLS again.",
+                );
+              }
+            }
           });
         } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
           video.src = src;
           await video.play().catch(() => {});
           log("native HLS play");
+          setStatus("hls playing");
         } else {
           throw new Error("HLS not supported in this browser");
         }
-        setStatus("hls playing");
         el("btnLeave").disabled = false;
       }
 

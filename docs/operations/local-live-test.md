@@ -95,6 +95,21 @@ HLS_KEY_TEMPLATE=hls/{externalId}/{sessionId}
 
 (Compose gateway already injects these.)
 
+### HLS spins forever / empty video but MinIO has files
+
+**Cause:** MinIO bucket is **private**. Egress (with credentials) can write; the browser cannot `GET` `live.m3u8` / `.ts` → hls.js hangs or loops.
+
+**Fix (lab only):**
+
+```powershell
+.\scripts\ensure-minio-hls-public.ps1
+```
+
+Then open the playlist in a normal browser tab — you should see text starting with `#EXTM3U`.  
+Retry **hls_viewer → Join** or **Play HLS URL**.
+
+`start-local-live.ps1` now runs this helper automatically. `minio-init` also sets download policy on first boot; an existing volume created *before* that change stays private until you run the script once.
+
 ## How to test TURN (Phase 3a)
 
 ```powershell

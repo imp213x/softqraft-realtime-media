@@ -1,4 +1,5 @@
-# SoftQraft — start local stack + open Live test UI (WebRTC + Echo + optional HLS/TURN)
+# SoftQraft - start local stack + open Live test UI (WebRTC + Echo + optional HLS/TURN)
+# ASCII-only strings so Windows PowerShell 5.1 parses the file regardless of encoding.
 param(
   [string]$GatewayUrl = "http://localhost:8080",
   [string]$ApiKey = "dev-local-key",
@@ -63,13 +64,25 @@ if (-not $SkipCompose) {
     docker compose -f $compose up -d
   }
   if ($LASTEXITCODE -ne 0) {
-    throw "docker compose failed — is Docker Desktop running?"
+    throw "docker compose failed - is Docker Desktop running?"
   }
 
   if ($RebuildGateway) {
     Write-Host "Rebuilding gateway image..."
     docker compose -f $compose up -d --build gateway
   }
+} elseif ($RebuildGateway) {
+  $compose = Join-Path $Root "deploy\compose\docker-compose.yml"
+  Write-Host "Rebuilding gateway image (SkipCompose)..."
+  docker compose -f $compose up -d --build gateway
+}
+
+# Lab: ensure browser can GET HLS playlists/segments from MinIO without signed URLs
+try {
+  & (Join-Path $Root "scripts\ensure-minio-hls-public.ps1")
+} catch {
+  Write-Host "MinIO public-read setup skipped/failed: $_" -ForegroundColor Yellow
+  Write-Host "  If hls_viewer spins, run: .\scripts\ensure-minio-hls-public.ps1" -ForegroundColor Yellow
 }
 
 # Wait for gateway
@@ -128,7 +141,7 @@ $demoDir = Split-Path $demo
 
 Write-Host ""
 Write-Host "Live test UI:  http://localhost:$port/" -ForegroundColor Green
-Write-Host "  Host:        Go live → allow camera/mic (Echo auto by default)"
+Write-Host "  Host:        Go live -> allow camera/mic (Echo auto by default)"
 Write-Host "  HLS:         check Auto-start HLS or click Start HLS egress"
 Write-Host "  WebRTC view: second tab, role=realtime_viewer, paste session id, Join"
 Write-Host "  HLS view:    second tab, role=hls_viewer, paste session id, Join"
