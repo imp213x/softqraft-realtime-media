@@ -33,8 +33,8 @@ App → Gateway :8080 → LiveKit :7880 + media UDP
 | # | Step | Status |
 |---|------|--------|
 | H1 | LiveKit `node_ip` + `LIVEKIT_REALTIME_URL` = public IP | ✅ 2026-08-03 |
-| H2 | TLS + domain (`https` / `wss`) | ⬜ next |
-| H3 | Public coturn + `iceServers` | ⬜ |
+| H2 | TLS + domain (`https` / `wss`) | ✅ media/realtime.softqraftlabs.com via Caddy |
+| H3 | Public coturn + `iceServers` | ⬜ next |
 | H4 | Rotate API keys / secrets | ⬜ |
 | H5 | Firewall lockdown (not wide open) | ⬜ |
 | H6 | Static IP + basic monitoring | ⬜ |
