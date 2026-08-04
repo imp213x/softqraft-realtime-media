@@ -4,34 +4,40 @@ import { loadConfig } from "./config.js";
 import { requestIdHook } from "./lib/request-id.js";
 import { registerRawBodyHook } from "./lib/raw-body.js";
 import { QuotaTracker } from "./lib/quotas.js";
+import { CredentialStore } from "./lib/credential-store.js";
 import { createLiveKitClients } from "./providers/livekit/client.js";
 import { SessionStore } from "./modules/sessions/store.js";
 import { registerHealthRoutes } from "./modules/health/routes.js";
 import { registerSessionRoutes } from "./modules/sessions/routes.js";
 import { registerEgressRoutes } from "./modules/egress/routes.js";
 import { registerWebhookRoutes } from "./modules/webhooks/routes.js";
+import { registerAdminRoutes } from "./modules/admin/routes.js";
 
 async function main() {
   const config = loadConfig();
   const clients = createLiveKitClients(config);
   const store = new SessionStore();
   const quotas = new QuotaTracker();
+  const credentials = new CredentialStore({
+    storePath: config.tenantStorePath,
+    legacyKeys: config.serviceApiKeys,
+    envTenants: config.tenants,
+  });
+  await credentials.loadFromDisk();
 
   const app = Fastify({
     logger: true,
   });
 
-  // Local HTML demos + browser clients (tighten origins in production)
   await app.register(cors, {
     origin: true,
-    methods: ["GET", "POST", "OPTIONS"],
+    methods: ["GET", "POST", "DELETE", "OPTIONS"],
     allowedHeaders: ["Authorization", "Content-Type", "X-Request-Id"],
   });
 
   await requestIdHook(app);
   await registerRawBodyHook(app);
 
-  // LiveKit may post application/webhook+json
   app.addContentTypeParser(
     "application/webhook+json",
     { parseAs: "string" },
@@ -41,8 +47,9 @@ async function main() {
   );
 
   await registerHealthRoutes(app, config, clients);
-  await registerSessionRoutes(app, config, clients, store, quotas);
-  await registerEgressRoutes(app, config, clients, store, quotas);
+  await registerAdminRoutes(app, config, credentials);
+  await registerSessionRoutes(app, config, clients, store, quotas, credentials);
+  await registerEgressRoutes(app, config, clients, store, quotas, credentials);
   await registerWebhookRoutes(app, config, store);
 
   await app.listen({ port: config.port, host: config.host });
@@ -50,18 +57,15 @@ async function main() {
     {
       realtimeUrl: config.realtimeUrl,
       livekitUrl: config.livekitUrl,
-      tenants: config.tenants.map((t) => ({
-        tenantId: t.tenantId,
-        maxSessions: t.maxSessions,
-        maxEgress: t.maxEgress,
-      })),
+      publicGatewayUrl: config.publicGatewayUrl || null,
+      adminEnabled: Boolean(config.adminToken),
+      tenantStorePath: config.tenantStorePath,
+      tenantCount: credentials.tenantCount(),
       iceServers: config.iceServers.map((s) => ({
         urls: s.urls,
         hasAuth: Boolean(s.username),
       })),
       hlsPublicBaseUrl: config.hlsPublicBaseUrl || null,
-      cdnPublicBaseUrl: config.cdnPublicBaseUrl || null,
-      webhookForwardUrls: config.webhookForwardUrls,
       s3: config.s3
         ? { bucket: config.s3.bucket, endpoint: config.s3.endpoint ?? "aws" }
         : null,

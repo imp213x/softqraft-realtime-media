@@ -15,12 +15,15 @@ RUN pnpm install --frozen-lockfile
 
 COPY packages/shared/src ./packages/shared/src
 COPY services/gateway-api/src ./services/gateway-api/src
+COPY services/gateway-api/public ./services/gateway-api/public
 
 RUN pnpm --filter @softqraft/shared build \
  && pnpm --filter @softqraft/gateway-api build
 
 # Prod-only deploy (includes built workspace package + runtime deps)
-RUN pnpm --filter @softqraft/gateway-api deploy --prod /out
+RUN pnpm --filter @softqraft/gateway-api deploy --prod /out \
+ && mkdir -p /out/public \
+ && cp -R /app/services/gateway-api/public/. /out/public/
 
 FROM node:22-alpine AS runner
 ENV NODE_ENV=production

@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SoftQraft Admin — API credentials</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0d12;
+        --panel: #111827;
+        --border: #243044;
+        --text: #e8ecf4;
+        --muted: #9fb3d1;
+        --accent: #2563eb;
+        --danger: #b91c1c;
+        --ok: #059669;
+        font-family: system-ui, Segoe UI, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--text); }
+      header {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+        justify-content: space-between;
+      }
+      h1 { font-size: 1.05rem; margin: 0; font-weight: 600; }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 1.25rem;
+        display: grid;
+        gap: 1.25rem;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1rem 1.1rem;
+      }
+      .card h2 {
+        margin: 0 0 0.75rem;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+      }
+      label {
+        display: block;
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-bottom: 0.25rem;
+      }
+      input, button, select {
+        width: 100%;
+        border-radius: 8px;
+        border: 1px solid #334155;
+        background: #0f172a;
+        color: var(--text);
+        padding: 0.55rem 0.65rem;
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+        background: var(--accent);
+        border-color: var(--accent);
+        font-weight: 600;
+        margin-top: 0.5rem;
+      }
+      button.secondary { background: #1e293b; border-color: #334155; }
+      button.danger { background: var(--danger); border-color: var(--danger); width: auto; margin: 0; padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+      @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+      .muted { color: var(--muted); font-size: 0.85rem; line-height: 1.45; }
+      .mono { font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem; word-break: break-all; }
+      .banner {
+        background: #052e1c;
+        border: 1px solid #065f46;
+        color: #a7f3d0;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        display: none;
+      }
+      .banner.show { display: block; }
+      .banner code { user-select: all; }
+      table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+      th, td { text-align: left; padding: 0.5rem 0.35rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+      th { color: var(--muted); font-weight: 500; font-size: 0.75rem; }
+      .err { color: #fca5a5; font-size: 0.85rem; min-height: 1.2em; }
+      .ok { color: #6ee7b7; }
+      .meta { display: grid; gap: 0.35rem; }
+      .meta div { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+      .meta span { color: var(--muted); min-width: 7rem; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>SoftQraft Admin · API credentials</h1>
+      <span class="muted" id="statusLine">Sign in with admin token</span>
+    </header>
+    <main>
+      <section class="card" id="loginCard">
+        <h2>Admin access</h2>
+        <p class="muted">Uses <code>GATEWAY_ADMIN_TOKEN</code>. Not the LiveKit or tenant API keys.</p>
+        <label>Admin token</label>
+        <input id="adminToken" type="password" autocomplete="current-password" placeholder="Bearer secret" />
+        <button id="btnLogin" type="button">Unlock console</button>
+        <p class="err" id="loginErr"></p>
+      </section>
+
+      <section class="card" id="appCard" style="display: none">
+        <h2>Integration endpoints</h2>
+        <div class="meta mono" id="metaBox"></div>
+        <button type="button" class="secondary" id="btnLogout">Lock console</button>
+      </section>
+
+      <section class="card" id="createCard" style="display: none">
+        <h2>Generate credential</h2>
+        <div class="row">
+          <div>
+            <label>Tenant id (app / customer)</label>
+            <input id="tenantId" placeholder="my-app" />
+          </div>
+          <div>
+            <label>Label (optional)</label>
+            <input id="label" placeholder="Production" />
+          </div>
+        </div>
+        <div class="row" style="margin-top: 0.75rem">
+          <div>
+            <label>Max concurrent sessions</label>
+            <input id="maxSessions" type="number" value="50" min="1" />
+          </div>
+          <div>
+            <label>Max concurrent egress</label>
+            <input id="maxEgress" type="number" value="10" min="1" />
+          </div>
+        </div>
+        <button type="button" id="btnCreate">Create API key</button>
+        <p class="err" id="createErr"></p>
+        <div class="banner" id="createdBanner">
+          <strong>Copy now — full key shown once</strong>
+          <div class="mono" style="margin-top: 0.5rem" id="createdKey"></div>
+          <div class="muted" style="margin-top: 0.5rem" id="createdHint"></div>
+        </div>
+      </section>
+
+      <section class="card" id="listCard" style="display: none">
+        <h2>Credentials</h2>
+        <button type="button" class="secondary" id="btnRefresh">Refresh</button>
+        <div style="overflow-x: auto; margin-top: 0.75rem">
+          <table>
+            <thead>
+              <tr>
+                <th>Tenant</th>
+                <th>Key</th>
+                <th>Quotas</th>
+                <th>Created</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="credBody"></tbody>
+          </table>
+        </div>
+        <p class="err" id="listErr"></p>
+      </section>
+
+      <section class="card" id="docsCard" style="display: none">
+        <h2>App integration (minimal)</h2>
+        <pre class="mono muted" id="snippet" style="white-space: pre-wrap; margin: 0"></pre>
+      </section>
+    </main>
+    <script>
+      const el = (id) => document.getElementById(id);
+      const base = () => location.origin.replace(/\/$/, "");
+
+      function token() {
+        return sessionStorage.getItem("sq_admin_token") || "";
+      }
+
+      function setToken(t) {
+        if (t) sessionStorage.setItem("sq_admin_token", t);
+        else sessionStorage.removeItem("sq_admin_token");
+      }
+
+      async function api(path, { method = "GET", body } = {}) {
+        const res = await fetch(`${base()}${path}`, {
+          method,
+          headers: {
+            Authorization: `Bearer ${token()}`,
+            "Content-Type": "application/json",
+          },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.error?.message || `HTTP ${res.status}`);
+        }
+        return data;
+      }
+
+      function showApp(on) {
+        el("loginCard").style.display = on ? "none" : "block";
+        ["appCard", "createCard", "listCard", "docsCard"].forEach((id) => {
+          el(id).style.display = on ? "block" : "none";
+        });
+      }
+
+      async function loadMeta() {
+        const m = await api("/admin/v1/meta");
+        el("metaBox").innerHTML = `
+          <div><span>Gateway</span><code>${m.publicGatewayUrl}</code></div>
+          <div><span>Realtime</span><code>${m.realtimeUrl}</code></div>
+          <div><span>Tenants</span><code>${m.tenantCount}</code></div>`;
+        el("statusLine").textContent = "Admin unlocked";
+        el("snippet").textContent = `POST ${m.publicGatewayUrl}/v1/sessions
+Authorization: Bearer <apiKey>
+Content-Type: application/json
+
+{ "externalId": "show-1", "profile": "creator_live_webrtc" }
+
+POST ${m.publicGatewayUrl}/v1/sessions/{sessionId}/tokens
+Authorization: Bearer <apiKey>
+
+{ "identity": "host-1", "role": "host" }
+
+// Client: LiveKit room.connect(realtimeUrl, token, { rtcConfig: { iceServers } })
+// realtimeUrl + iceServers come from the token response`;
+        return m;
+      }
+
+      async function loadList() {
+        el("listErr").textContent = "";
+        try {
+          const data = await api("/admin/v1/credentials");
+          const body = el("credBody");
+          body.innerHTML = "";
+          if (!data.items?.length) {
+            body.innerHTML = `<tr><td colspan="5" class="muted">No credentials yet</td></tr>`;
+            return;
+          }
+          for (const c of data.items) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td><strong>${escapeHtml(c.tenantId)}</strong><br/><span class="muted">${escapeHtml(c.label || "")}</span>
+              ${c.managed ? "" : '<br/><span class="muted">env bootstrap</span>'}</td>
+              <td class="mono">${escapeHtml(c.apiKeyPreview)}</td>
+              <td class="muted">sess ${c.maxSessions} · egress ${c.maxEgress}</td>
+              <td class="muted">${c.createdAt ? new Date(c.createdAt).toLocaleString() : "—"}</td>
+              <td></td>`;
+            if (c.managed) {
+              const btn = document.createElement("button");
+              btn.type = "button";
+              btn.className = "danger";
+              btn.textContent = "Revoke";
+              btn.onclick = () => revoke(c.tenantId);
+              tr.lastElementChild.appendChild(btn);
+            }
+            body.appendChild(tr);
+          }
+        } catch (err) {
+          el("listErr").textContent = err.message || String(err);
+        }
+      }
+
+      async function revoke(tenantId) {
+        if (!confirm(`Revoke credential for ${tenantId}?`)) return;
+        try {
+          await api(`/admin/v1/credentials/${encodeURIComponent(tenantId)}`, {
+            method: "DELETE",
+          });
+          await loadList();
+          await loadMeta();
+        } catch (err) {
+          el("listErr").textContent = err.message || String(err);
+        }
+      }
+
+      async function unlock() {
+        el("loginErr").textContent = "";
+        const t = el("adminToken").value.trim();
+        if (!t) {
+          el("loginErr").textContent = "Enter admin token";
+          return;
+        }
+        setToken(t);
+        try {
+          await loadMeta();
+          showApp(true);
+          await loadList();
+        } catch (err) {
+          setToken("");
+          showApp(false);
+          el("loginErr").textContent = err.message || String(err);
+        }
+      }
+
+      async function createCred() {
+        el("createErr").textContent = "";
+        el("createdBanner").classList.remove("show");
+        try {
+          const created = await api("/admin/v1/credentials", {
+            method: "POST",
+            body: {
+              tenantId: el("tenantId").value.trim(),
+              label: el("label").value.trim() || undefined,
+              maxSessions: Number(el("maxSessions").value) || 50,
+              maxEgress: Number(el("maxEgress").value) || 10,
+            },
+          });
+          el("createdKey").textContent = created.apiKey;
+          el("createdHint").textContent =
+            created.warning || "Store this key server-side only.";
+          el("createdBanner").classList.add("show");
+          el("tenantId").value = "";
+          await loadList();
+          await loadMeta();
+        } catch (err) {
+          el("createErr").textContent = err.message || String(err);
+        }
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      el("btnLogin").onclick = unlock;
+      el("btnLogout").onclick = () => {
+        setToken("");
+        showApp(false);
+        el("statusLine").textContent = "Sign in with admin token";
+      };
+      el("btnCreate").onclick = createCred;
+      el("btnRefresh").onclick = loadList;
+
+      if (token()) {
+        el("adminToken").value = token();
+        unlock();
+      }
+    </script>
+  </body>
+</html>

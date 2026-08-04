@@ -1,8 +1,8 @@
 # Phased delivery
 
-**Last updated:** 2026-08-03  
-**Current phase:** **Public interactive SFU on GCP — hardening ladder**  
-**Phase 1:** ✅ Complete (local + public WebRTC host/viewer)
+**Last updated:** 2026-08-04  
+**Current phase:** **Admin console + credentials (product integration UX)**  
+**Phase 1:** ✅ Complete · **Hardening H1–H6:** ✅ · Public interactive SFU
 
 | Phase | Name | Status | Exit criteria |
 |------:|------|--------|---------------|
@@ -103,7 +103,13 @@ See [public-sfu-readiness.md](../operations/public-sfu-readiness.md).
 | H5 | Firewall lockdown | ⬜ |
 | H6 | Static IP + monitoring | ⬜ |
 
-Echo / HLS / CDN remain deferred until interactive path is hardened.
+Echo / HLS / CDN remain deferred. Interactive path hardened.
+
+## Product: Admin console 🔄
+
+- Docs: [product-plan.md](../product/product-plan.md), [admin-console.md](../product/admin-console.md)  
+- Gateway: `/admin/` UI + `/admin/v1/credentials` generate/list/revoke  
+- File-backed tenant keys (`TENANT_STORE_PATH`) + `GATEWAY_ADMIN_TOKEN`  
 
 ## Phase 4 — Production cutover ⏳
 

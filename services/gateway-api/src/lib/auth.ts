@@ -1,5 +1,6 @@
 import type { FastifyRequest } from "fastify";
-import type { GatewayConfig, TenantRecord } from "../config.js";
+import type { TenantRecord } from "../config.js";
+import type { CredentialStore } from "./credential-store.js";
 import { ERROR_CODES } from "@softqraft/shared";
 
 export class HttpError extends Error {
@@ -20,11 +21,11 @@ export interface AuthContext {
 }
 
 /**
- * Resolve bearer API key → tenant (or legacy key set).
+ * Resolve bearer API key → tenant (or legacy key set) via CredentialStore.
  */
 export function requireServiceAuth(
   req: FastifyRequest,
-  config: GatewayConfig,
+  credentials: CredentialStore,
 ): AuthContext {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) {
@@ -35,21 +36,9 @@ export function requireServiceAuth(
     throw new HttpError(401, ERROR_CODES.UNAUTHORIZED, "Missing bearer token");
   }
 
-  // Multi-tenant registry takes precedence when configured
-  if (config.tenantsByKey.size > 0) {
-    const tenant = config.tenantsByKey.get(token);
-    if (!tenant) {
-      // Fall back to legacy keys if present
-      if (config.serviceApiKeys.has(token)) {
-        return { tenant: null, apiKey: token };
-      }
-      throw new HttpError(401, ERROR_CODES.UNAUTHORIZED, "Invalid service key");
-    }
-    return { tenant, apiKey: token };
-  }
-
-  if (!config.serviceApiKeys.has(token)) {
+  const resolved = credentials.resolve(token);
+  if (!resolved) {
     throw new HttpError(401, ERROR_CODES.UNAUTHORIZED, "Invalid service key");
   }
-  return { tenant: null, apiKey: token };
+  return { tenant: resolved.tenant, apiKey: resolved.apiKey };
 }

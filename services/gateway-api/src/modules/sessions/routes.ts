@@ -5,6 +5,7 @@ import type { GatewayConfig } from "../../config.js";
 import type { LiveKitClients } from "../../providers/livekit/client.js";
 import { requireServiceAuth, HttpError } from "../../lib/auth.js";
 import type { QuotaTracker } from "../../lib/quotas.js";
+import type { CredentialStore } from "../../lib/credential-store.js";
 import { sendError } from "../../lib/errors.js";
 import { ERROR_CODES } from "@softqraft/shared";
 import { SessionStore, assertSessionAccess } from "./store.js";
@@ -64,10 +65,11 @@ export async function registerSessionRoutes(
   clients: LiveKitClients,
   store: SessionStore,
   quotas: QuotaTracker,
+  credentials: CredentialStore,
 ): Promise<void> {
   app.post("/v1/sessions", async (req, reply) => {
     try {
-      const auth = requireServiceAuth(req, config);
+      const auth = requireServiceAuth(req, credentials);
       const body = createSessionBody.parse(req.body ?? {});
       const tenantId = auth.tenant?.tenantId ?? null;
 
@@ -148,13 +150,14 @@ export async function registerSessionRoutes(
 
   app.get("/v1/sessions", async (req, reply) => {
     try {
-      const auth = requireServiceAuth(req, config);
+      const auth = requireServiceAuth(req, credentials);
       const q = req.query as { status?: string; limit?: string };
       const limit = Math.min(100, Math.max(1, Number(q.limit ?? 20) || 20));
       const tenantId = auth.tenant?.tenantId ?? null;
       // When multi-tenant is active, scope list to caller's tenant
-      const scopeTenant =
-        config.tenantsByKey.size > 0 ? tenantId : undefined;
+      const scopeTenant = credentials.hasTenantIsolation()
+        ? tenantId
+        : undefined;
       const items = store
         .list(q.status, limit, scopeTenant)
         .map(toPublicSession);
@@ -166,7 +169,7 @@ export async function registerSessionRoutes(
 
   app.get("/v1/sessions/:sessionId", async (req, reply) => {
     try {
-      const auth = requireServiceAuth(req, config);
+      const auth = requireServiceAuth(req, credentials);
       const { sessionId } = req.params as { sessionId: string };
       const session = store.get(sessionId);
       const tenantId = auth.tenant?.tenantId ?? null;
@@ -181,7 +184,7 @@ export async function registerSessionRoutes(
 
   app.post("/v1/sessions/:sessionId/end", async (req, reply) => {
     try {
-      const auth = requireServiceAuth(req, config);
+      const auth = requireServiceAuth(req, credentials);
       const { sessionId } = req.params as { sessionId: string };
       const session = store.get(sessionId);
       const tenantId = auth.tenant?.tenantId ?? null;
@@ -223,7 +226,7 @@ export async function registerSessionRoutes(
 
   app.post("/v1/sessions/:sessionId/tokens", async (req, reply) => {
     try {
-      const auth = requireServiceAuth(req, config);
+      const auth = requireServiceAuth(req, credentials);
       const { sessionId } = req.params as { sessionId: string };
       const session = store.get(sessionId);
       const tenantId = auth.tenant?.tenantId ?? null;
@@ -260,7 +263,7 @@ export async function registerSessionRoutes(
 
   app.get("/v1/sessions/:sessionId/playback", async (req, reply) => {
     try {
-      const auth = requireServiceAuth(req, config);
+      const auth = requireServiceAuth(req, credentials);
       const { sessionId } = req.params as { sessionId: string };
       const session = store.get(sessionId);
       const tenantId = auth.tenant?.tenantId ?? null;

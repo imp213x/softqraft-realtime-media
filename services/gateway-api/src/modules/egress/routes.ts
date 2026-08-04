@@ -4,6 +4,7 @@ import type { GatewayConfig } from "../../config.js";
 import type { LiveKitClients } from "../../providers/livekit/client.js";
 import { requireServiceAuth, HttpError } from "../../lib/auth.js";
 import type { QuotaTracker } from "../../lib/quotas.js";
+import type { CredentialStore } from "../../lib/credential-store.js";
 import { sendError } from "../../lib/errors.js";
 import { ERROR_CODES } from "@softqraft/shared";
 import type { SessionStore } from "../sessions/store.js";
@@ -64,10 +65,11 @@ export async function registerEgressRoutes(
   clients: LiveKitClients,
   store: SessionStore,
   quotas: QuotaTracker,
+  credentials: CredentialStore,
 ): Promise<void> {
   app.post("/v1/sessions/:sessionId/egress", async (req, reply) => {
     try {
-      const auth = requireServiceAuth(req, config);
+      const auth = requireServiceAuth(req, credentials);
       const { sessionId } = req.params as { sessionId: string };
       const session = store.get(sessionId);
       const tenantId = auth.tenant?.tenantId ?? null;
@@ -207,7 +209,7 @@ export async function registerEgressRoutes(
 
   app.get("/v1/sessions/:sessionId/egress", async (req, reply) => {
     try {
-      const auth = requireServiceAuth(req, config);
+      const auth = requireServiceAuth(req, credentials);
       const { sessionId } = req.params as { sessionId: string };
       const session = store.get(sessionId);
       const tenantId = auth.tenant?.tenantId ?? null;
@@ -245,7 +247,7 @@ export async function registerEgressRoutes(
 
   app.get("/v1/egress/:egressId", async (req, reply) => {
     try {
-      const auth = requireServiceAuth(req, config);
+      const auth = requireServiceAuth(req, credentials);
       const { egressId } = req.params as { egressId: string };
       let job = store.getEgress(egressId);
       const tenantId = auth.tenant?.tenantId ?? null;
@@ -312,7 +314,7 @@ export async function registerEgressRoutes(
 
   app.post("/v1/egress/:egressId/stop", async (req, reply) => {
     try {
-      const auth = requireServiceAuth(req, config);
+      const auth = requireServiceAuth(req, credentials);
       const { egressId } = req.params as { egressId: string };
       let job = store.getEgress(egressId);
       const tenantId = auth.tenant?.tenantId ?? null;

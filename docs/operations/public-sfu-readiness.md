@@ -1,7 +1,8 @@
 # Public SFU readiness (no Echo / no HLS)
 
-**Status:** Interactive WebRTC live proven on GCP (2026-08-03)  
+**Status:** Interactive WebRTC live proven on GCP · H1–H6 ✅ (2026-08-04)  
 **Product slice:** Self-host LiveKit + Gateway — not LiveKit Cloud  
+**Next product:** Admin console + API credentials — see [product-plan.md](../product/product-plan.md)  
 **Deferred:** Echo (MP4), HLS/CDN audience scale  
 
 ## Proven

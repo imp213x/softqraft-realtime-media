@@ -52,6 +52,12 @@ export interface GatewayConfig {
    * LiveKit webhooks are verified then forwarded with the original signature.
    */
   webhookForwardUrls: string[];
+  /** Bearer token for /admin/* (credential management). Empty = admin disabled. */
+  adminToken: string;
+  /** JSON file for admin-generated API keys */
+  tenantStorePath: string;
+  /** Public HTTPS base for Admin UI meta (e.g. https://media.softqraftlabs.com) */
+  publicGatewayUrl: string;
 }
 
 function env(name: string, fallback = ""): string {
@@ -207,5 +213,15 @@ export function loadConfig(): GatewayConfig {
       .split(",")
       .map((u) => u.trim())
       .filter(Boolean),
+    adminToken: env("GATEWAY_ADMIN_TOKEN"),
+    tenantStorePath: env(
+      "TENANT_STORE_PATH",
+      pathDefaultTenantStore(),
+    ),
+    publicGatewayUrl: env("PUBLIC_GATEWAY_URL").replace(/\/$/, ""),
   };
+}
+
+function pathDefaultTenantStore(): string {
+  return `${process.cwd()}/data/tenants.json`;
 }
