@@ -37,7 +37,7 @@ App → Gateway :8080 → LiveKit :7880 + media UDP
 | H3 | Public coturn + `iceServers` | ✅ turn:34.60.190.142:3478 in gateway tokens |
 | H4 | Rotate API keys / secrets | ✅ operator rotated (2026-08-03) |
 | H5 | Firewall lockdown (not wide open) | ✅ 8080/9000 closed; media HTTPS ok; host/viewer live via media.softqraftlabs.com |
-| H6 | Static IP + basic monitoring | ⬜ next |
+| H6 | Static IP + basic monitoring | 🔄 in progress |
 | H7 | Session durability (optional Redis/DB) | ⬜ later |
 | H8 | HLS + R2/CDN | ⬜ when scale needed |
 | H9 | Echo / recording | ⬜ deferred |
@@ -89,6 +89,14 @@ Keep public only what clients need:
 | 8080 | Prefer **no** if all via `media.*` |
 | 9000-9001, 6379 | **No** (MinIO/Redis internal) |
 | 22 | Your IP only |
+
+## H6 — static IP + monitoring (GCP)
+
+1. Reserve static external IP; attach to `softqraft-media-1`
+2. If IP changes: update DNS A for `media` + `realtime`, `node_ip`, `TURN_HOST` / `TURN_EXTERNAL_IP`, recreate livekit/gateway/coturn
+3. If IP unchanged (promote ephemeral → static): no DNS change
+4. Basic monitoring: GCP uptime check on `https://media.softqraftlabs.com/health` + optional alert email
+5. Optional OS: UDP buffer sysctl for LiveKit production warning
 
 ## Ops facts
 
