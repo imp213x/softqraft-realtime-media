@@ -36,8 +36,8 @@ App → Gateway :8080 → LiveKit :7880 + media UDP
 | H2 | TLS + domain (`https` / `wss`) | ✅ media/realtime.softqraftlabs.com via Caddy |
 | H3 | Public coturn + `iceServers` | ✅ turn:34.60.190.142:3478 in gateway tokens |
 | H4 | Rotate API keys / secrets | ✅ operator rotated (2026-08-03) |
-| H5 | Firewall lockdown (not wide open) | ✅ 8080/9000 closed; media HTTPS ok |
-| H6 | Static IP + basic monitoring | ⬜ |
+| H5 | Firewall lockdown (not wide open) | ✅ 8080/9000 closed; media HTTPS ok; host/viewer live via media.softqraftlabs.com |
+| H6 | Static IP + basic monitoring | ⬜ next |
 | H7 | Session durability (optional Redis/DB) | ⬜ later |
 | H8 | HLS + R2/CDN | ⬜ when scale needed |
 | H9 | Echo / recording | ⬜ deferred |
