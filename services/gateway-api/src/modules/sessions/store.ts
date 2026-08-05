@@ -1,58 +1,110 @@
 import type { EgressJobRecord, SessionRecord } from "./types.js";
 
 /**
- * In-memory store for Phase 1–3 single-node Gateway.
- * Production will persist session metadata (Postgres) while LiveKit remains room SoT.
+ * Session + egress + idempotency store.
+ * Memory (dev/demo) or Postgres (durable multi-instance).
  */
-export class SessionStore {
+export interface SessionStore {
+  create(record: SessionRecord): Promise<SessionRecord>;
+  get(sessionId: string): Promise<SessionRecord | undefined>;
+  getByIdempotencyKey(
+    key: string,
+    tenantId: string | null,
+  ): Promise<SessionRecord | undefined>;
+  /** Active (non-ended) session for a LiveKit room name — webhook reconcile. */
+  getActiveByRoomName(roomName: string): Promise<SessionRecord | undefined>;
+  list(
+    status?: string,
+    limit?: number,
+    tenantId?: string | null,
+  ): Promise<SessionRecord[]>;
+  update(
+    sessionId: string,
+    patch: Partial<SessionRecord>,
+  ): Promise<SessionRecord | undefined>;
+  end(sessionId: string): Promise<SessionRecord | undefined>;
+  putEgress(job: EgressJobRecord): Promise<EgressJobRecord>;
+  getEgress(egressId: string): Promise<EgressJobRecord | undefined>;
+  listEgress(sessionId: string): Promise<EgressJobRecord[]>;
+  /** Optional cleanup for pools */
+  close?(): Promise<void>;
+}
+
+/** Ensure caller tenant owns the session (or legacy unscoped). */
+export function assertSessionAccess(
+  session: SessionRecord | undefined,
+  tenantId: string | null,
+): session is SessionRecord {
+  if (!session) return false;
+  if (tenantId !== null && session.tenantId !== tenantId) {
+    return false;
+  }
+  if (tenantId === null && session.tenantId !== null) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * In-memory store — single-node / tests only.
+ */
+export class MemorySessionStore implements SessionStore {
   private sessions = new Map<string, SessionRecord>();
   private byIdempotency = new Map<string, string>();
   private egressById = new Map<string, EgressJobRecord>();
   private egressBySession = new Map<string, string[]>();
 
-  create(record: SessionRecord): SessionRecord {
+  async create(record: SessionRecord): Promise<SessionRecord> {
     this.sessions.set(record.sessionId, record);
     if (record.idempotencyKey) {
-      // Scope idempotency by tenant to avoid cross-tenant collisions
       const idempKey = `${record.tenantId ?? "_"}:${record.idempotencyKey}`;
       this.byIdempotency.set(idempKey, record.sessionId);
     }
     return record;
   }
 
-  get(sessionId: string): SessionRecord | undefined {
+  async get(sessionId: string): Promise<SessionRecord | undefined> {
     return this.sessions.get(sessionId);
   }
 
-  getByIdempotencyKey(
+  async getByIdempotencyKey(
     key: string,
     tenantId: string | null,
-  ): SessionRecord | undefined {
+  ): Promise<SessionRecord | undefined> {
     const idempKey = `${tenantId ?? "_"}:${key}`;
     const id = this.byIdempotency.get(idempKey);
     return id ? this.sessions.get(id) : undefined;
   }
 
-  list(
+  async getActiveByRoomName(
+    roomName: string,
+  ): Promise<SessionRecord | undefined> {
+    const matches = [...this.sessions.values()].filter(
+      (s) => s.roomName === roomName && s.status !== "ended",
+    );
+    matches.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return matches[0];
+  }
+
+  async list(
     status?: string,
     limit = 20,
     tenantId?: string | null,
-  ): SessionRecord[] {
+  ): Promise<SessionRecord[]> {
     const all = [...this.sessions.values()].sort((a, b) =>
       b.createdAt.localeCompare(a.createdAt),
     );
     let filtered = status ? all.filter((s) => s.status === status) : all;
     if (tenantId !== undefined) {
-      // null tenantId filter = only unscoped; string = that tenant
       filtered = filtered.filter((s) => s.tenantId === tenantId);
     }
     return filtered.slice(0, limit);
   }
 
-  update(
+  async update(
     sessionId: string,
     patch: Partial<SessionRecord>,
-  ): SessionRecord | undefined {
+  ): Promise<SessionRecord | undefined> {
     const existing = this.sessions.get(sessionId);
     if (!existing) return undefined;
     const updated = { ...existing, ...patch };
@@ -60,9 +112,10 @@ export class SessionStore {
     return updated;
   }
 
-  end(sessionId: string): SessionRecord | undefined {
+  async end(sessionId: string): Promise<SessionRecord | undefined> {
     const existing = this.sessions.get(sessionId);
     if (!existing) return undefined;
+    if (existing.status === "ended") return existing;
     const updated: SessionRecord = {
       ...existing,
       status: "ended",
@@ -77,7 +130,7 @@ export class SessionStore {
     return updated;
   }
 
-  putEgress(job: EgressJobRecord): EgressJobRecord {
+  async putEgress(job: EgressJobRecord): Promise<EgressJobRecord> {
     this.egressById.set(job.egressId, job);
     const list = this.egressBySession.get(job.sessionId) ?? [];
     if (!list.includes(job.egressId)) {
@@ -87,11 +140,11 @@ export class SessionStore {
     return job;
   }
 
-  getEgress(egressId: string): EgressJobRecord | undefined {
+  async getEgress(egressId: string): Promise<EgressJobRecord | undefined> {
     return this.egressById.get(egressId);
   }
 
-  listEgress(sessionId: string): EgressJobRecord[] {
+  async listEgress(sessionId: string): Promise<EgressJobRecord[]> {
     const ids = this.egressBySession.get(sessionId) ?? [];
     return ids
       .map((id) => this.egressById.get(id))
@@ -99,22 +152,5 @@ export class SessionStore {
   }
 }
 
-/** Ensure caller tenant owns the session (or legacy unscoped). */
-export function assertSessionAccess(
-  session: SessionRecord | undefined,
-  tenantId: string | null,
-): session is SessionRecord {
-  if (!session) return false;
-  // Multi-tenant key: must match
-  if (tenantId !== null && session.tenantId !== tenantId) {
-    return false;
-  }
-  // Legacy key (tenantId null): can only access unscoped sessions when tenants
-  // are configured — if session has a tenant, legacy keys cannot see it.
-  if (tenantId === null && session.tenantId !== null) {
-    // Allow if no multi-tenant isolation was intended (legacy-only mode stores null)
-    // When session.tenantId is set, require matching tenant key.
-    return false;
-  }
-  return true;
-}
+/** @deprecated Use MemorySessionStore — alias for older imports */
+export class SessionStoreMemory extends MemorySessionStore {}

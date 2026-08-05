@@ -10,6 +10,7 @@ import { ERROR_CODES } from "@softqraft/shared";
 import type { SessionStore } from "../sessions/store.js";
 import { assertSessionAccess } from "../sessions/store.js";
 import { toPublicEgress } from "../sessions/types.js";
+import type { EgressJobRecord } from "../sessions/types.js";
 import {
   buildHlsPlaybackUrl,
   isTerminalEgressStatus,
@@ -21,6 +22,7 @@ import {
   stopEgressJob,
   getEgress,
 } from "../../providers/livekit/egress.js";
+import type { UsageMeter } from "../../lib/usage-meter.js";
 
 const startEgressBody = z.object({
   type: z.enum([
@@ -43,17 +45,17 @@ const startEgressBody = z.object({
     .optional(),
 });
 
-function releaseEgressQuotaIfNeeded(
+async function releaseEgressQuotaIfNeeded(
   quotas: QuotaTracker,
   job: { tenantId: string | null; quotaHeld?: boolean; status: string },
   nextStatus: string,
-): boolean {
+): Promise<boolean> {
   if (
     job.quotaHeld &&
     !isTerminalEgressStatus(job.status) &&
     isTerminalEgressStatus(nextStatus)
   ) {
-    quotas.onEgressTerminal(job.tenantId);
+    await quotas.releaseEgress(job.tenantId);
     return true;
   }
   return false;
@@ -66,14 +68,20 @@ export async function registerEgressRoutes(
   store: SessionStore,
   quotas: QuotaTracker,
   credentials: CredentialStore,
+  usage: UsageMeter,
 ): Promise<void> {
   app.post("/v1/sessions/:sessionId/egress", async (req, reply) => {
+    let reserved = false;
+    let reservedTenant: string | null = null;
     try {
       const auth = requireServiceAuth(req, credentials);
       const { sessionId } = req.params as { sessionId: string };
-      const session = store.get(sessionId);
+      const session = await store.get(sessionId);
       const tenantId = auth.tenant?.tenantId ?? null;
-      if (!assertSessionAccess(session, tenantId) || session.status === "ended") {
+      if (
+        !assertSessionAccess(session, tenantId) ||
+        session.status === "ended"
+      ) {
         throw new HttpError(404, ERROR_CODES.NOT_FOUND, "Session not found");
       }
 
@@ -98,7 +106,9 @@ export async function registerEgressRoutes(
         );
       }
 
-      quotas.assertCanStartEgress(auth.tenant);
+      await quotas.tryReserveEgress(auth.tenant);
+      reserved = Boolean(auth.tenant);
+      reservedTenant = session.tenantId;
 
       const externalId = sanitizePathSegment(
         session.externalId ?? session.sessionId,
@@ -142,11 +152,7 @@ export async function registerEgressRoutes(
             livePlaylistName,
             segmentDurationSeconds: body.options?.segmentDurationSeconds,
           });
-          hlsUrl = buildHlsPlaybackUrl(
-            config,
-            hlsPrefix,
-            livePlaylistName,
-          );
+          hlsUrl = buildHlsPlaybackUrl(config, hlsPrefix, livePlaylistName);
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -166,10 +172,10 @@ export async function registerEgressRoutes(
         );
       }
 
-      quotas.onEgressStarted(session.tenantId);
+      usage.recordEgressStarted();
 
       const now = new Date().toISOString();
-      const job = store.putEgress({
+      const job = await store.putEgress({
         egressId,
         sessionId,
         tenantId: session.tenantId,
@@ -181,21 +187,29 @@ export async function registerEgressRoutes(
         error: null,
         createdAt: now,
         updatedAt: now,
-        quotaHeld: true,
+        quotaHeld: Boolean(auth.tenant) || session.tenantId != null,
       });
+      reserved = false;
 
       if (body.type === "room_composite_hls" && hlsUrl) {
-        store.update(sessionId, {
+        await store.update(sessionId, {
           playback: { status: "ready", hlsUrl },
         });
       }
 
       if (session.status === "ready") {
-        store.update(sessionId, { status: "live" });
+        await store.update(sessionId, { status: "live" });
       }
 
       return reply.status(202).send(toPublicEgress(job));
     } catch (err) {
+      if (reserved) {
+        try {
+          await quotas.releaseEgress(reservedTenant);
+        } catch {
+          /* best-effort */
+        }
+      }
       if (err instanceof z.ZodError) {
         return sendError(
           req,
@@ -211,32 +225,17 @@ export async function registerEgressRoutes(
     try {
       const auth = requireServiceAuth(req, credentials);
       const { sessionId } = req.params as { sessionId: string };
-      const session = store.get(sessionId);
+      const session = await store.get(sessionId);
       const tenantId = auth.tenant?.tenantId ?? null;
       if (!assertSessionAccess(session, tenantId)) {
         throw new HttpError(404, ERROR_CODES.NOT_FOUND, "Session not found");
       }
 
       const items = [];
-      for (const job of store.listEgress(sessionId)) {
-        try {
-          const info = await getEgress(clients, job.egressId);
-          if (info) {
-            const status = mapEgressStatus(info);
-            const released = releaseEgressQuotaIfNeeded(quotas, job, status);
-            const updated = store.putEgress({
-              ...job,
-              status,
-              quotaHeld: released ? false : job.quotaHeld,
-              updatedAt: new Date().toISOString(),
-            });
-            items.push(toPublicEgress(updated));
-            continue;
-          }
-        } catch {
-          /* keep cached */
-        }
-        items.push(toPublicEgress(job));
+      for (const job of await store.listEgress(sessionId)) {
+        items.push(
+          toPublicEgress(await syncEgressFromLiveKit(clients, store, quotas, job)),
+        );
       }
 
       return reply.send({ items });
@@ -249,11 +248,11 @@ export async function registerEgressRoutes(
     try {
       const auth = requireServiceAuth(req, credentials);
       const { egressId } = req.params as { egressId: string };
-      let job = store.getEgress(egressId);
+      let job = await store.getEgress(egressId);
       const tenantId = auth.tenant?.tenantId ?? null;
 
       if (job) {
-        const session = store.get(job.sessionId);
+        const session = await store.get(job.sessionId);
         if (!assertSessionAccess(session, tenantId)) {
           throw new HttpError(
             404,
@@ -261,28 +260,13 @@ export async function registerEgressRoutes(
             "Egress job not found",
           );
         }
+        job = await syncEgressFromLiveKit(clients, store, quotas, job);
+        return reply.send(toPublicEgress(job));
       }
 
       try {
         const info = await getEgress(clients, egressId);
-        if (info && job) {
-          const status = mapEgressStatus(info);
-          const released = releaseEgressQuotaIfNeeded(quotas, job, status);
-          job = store.putEgress({
-            ...job,
-            status,
-            quotaHeld: released ? false : job.quotaHeld,
-            updatedAt: new Date().toISOString(),
-          });
-        } else if (info && !job) {
-          // Unknown to local store — return LiveKit snapshot (legacy keys only)
-          if (tenantId !== null) {
-            throw new HttpError(
-              404,
-              ERROR_CODES.EGRESS_NOT_FOUND,
-              "Egress job not found",
-            );
-          }
+        if (info && tenantId === null) {
           return reply.send({
             egressId,
             sessionId: null,
@@ -294,19 +278,15 @@ export async function registerEgressRoutes(
             updatedAt: new Date().toISOString(),
           });
         }
-      } catch (err) {
-        if (err instanceof HttpError) throw err;
+      } catch {
         /* fall through */
       }
 
-      if (!job) {
-        throw new HttpError(
-          404,
-          ERROR_CODES.EGRESS_NOT_FOUND,
-          "Egress job not found",
-        );
-      }
-      return reply.send(toPublicEgress(job));
+      throw new HttpError(
+        404,
+        ERROR_CODES.EGRESS_NOT_FOUND,
+        "Egress job not found",
+      );
     } catch (err) {
       return sendError(req, reply, err);
     }
@@ -316,11 +296,11 @@ export async function registerEgressRoutes(
     try {
       const auth = requireServiceAuth(req, credentials);
       const { egressId } = req.params as { egressId: string };
-      let job = store.getEgress(egressId);
+      let job = await store.getEgress(egressId);
       const tenantId = auth.tenant?.tenantId ?? null;
 
       if (job) {
-        const session = store.get(job.sessionId);
+        const session = await store.get(job.sessionId);
         if (!assertSessionAccess(session, tenantId)) {
           throw new HttpError(
             404,
@@ -330,7 +310,6 @@ export async function registerEgressRoutes(
         }
       }
 
-      // Already terminal — treat as success (UI may call stop after auto-abort)
       try {
         const current = await getEgress(clients, egressId);
         if (current) {
@@ -341,8 +320,12 @@ export async function registerEgressRoutes(
             status === "stopping"
           ) {
             if (job) {
-              const released = releaseEgressQuotaIfNeeded(quotas, job, status);
-              const updated = store.putEgress({
+              const released = await releaseEgressQuotaIfNeeded(
+                quotas,
+                job,
+                status,
+              );
+              const updated = await store.putEgress({
                 ...job,
                 status,
                 quotaHeld: released ? false : job.quotaHeld,
@@ -375,7 +358,6 @@ export async function registerEgressRoutes(
         info = await stopEgressJob(clients, egressId);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        // LiveKit rejects stop on ABORTED/COMPLETE — surface as terminal state
         if (/ABORTED|COMPLETE|FAILED|cannot be stopped/i.test(message)) {
           const status = /COMPLETE/i.test(message)
             ? "complete"
@@ -383,8 +365,12 @@ export async function registerEgressRoutes(
               ? "failed"
               : "failed";
           if (job) {
-            const released = releaseEgressQuotaIfNeeded(quotas, job, status);
-            const updated = store.putEgress({
+            const released = await releaseEgressQuotaIfNeeded(
+              quotas,
+              job,
+              status,
+            );
+            const updated = await store.putEgress({
               ...job,
               status,
               quotaHeld: released ? false : job.quotaHeld,
@@ -413,8 +399,8 @@ export async function registerEgressRoutes(
 
       if (job) {
         const status = mapEgressStatus(info);
-        const released = releaseEgressQuotaIfNeeded(quotas, job, status);
-        const updated = store.putEgress({
+        const released = await releaseEgressQuotaIfNeeded(quotas, job, status);
+        const updated = await store.putEgress({
           ...job,
           status,
           quotaHeld: released ? false : job.quotaHeld,
@@ -437,4 +423,26 @@ export async function registerEgressRoutes(
       return sendError(req, reply, err);
     }
   });
+}
+
+async function syncEgressFromLiveKit(
+  clients: LiveKitClients,
+  store: SessionStore,
+  quotas: QuotaTracker,
+  job: EgressJobRecord,
+): Promise<EgressJobRecord> {
+  try {
+    const info = await getEgress(clients, job.egressId);
+    if (!info) return job;
+    const status = mapEgressStatus(info);
+    const released = await releaseEgressQuotaIfNeeded(quotas, job, status);
+    return store.putEgress({
+      ...job,
+      status,
+      quotaHeld: released ? false : job.quotaHeld,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch {
+    return job;
+  }
 }

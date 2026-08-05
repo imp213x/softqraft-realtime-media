@@ -2,17 +2,24 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { WebhookReceiver } from "livekit-server-sdk";
 import type { GatewayConfig } from "../../config.js";
 import type { SessionStore } from "../sessions/store.js";
-import { mapEgressStatus } from "../../providers/livekit/egress.js";
+import type { QuotaTracker } from "../../lib/quotas.js";
+import type { UsageMeter } from "../../lib/usage-meter.js";
+import {
+  isTerminalEgressStatus,
+  mapEgressStatus,
+} from "../../providers/livekit/egress.js";
 
 /**
  * LiveKit signs webhooks with the project API key/secret.
- * We verify, update local egress state, and optionally forward the raw
- * payload to consumer apps (e.g. Clatters Echo finalize).
+ * We verify, update durable session/egress state, release quotas, and
+ * optionally forward the raw payload to consumer apps.
  */
 export async function registerWebhookRoutes(
   app: FastifyInstance,
   config: GatewayConfig,
   store: SessionStore,
+  quotas: QuotaTracker,
+  usage?: UsageMeter,
 ): Promise<void> {
   const receiver = new WebhookReceiver(
     config.livekitApiKey,
@@ -62,28 +69,22 @@ export async function registerWebhookRoutes(
 
     const eventName = String(event.event || "");
     req.log.info(
-      { event: eventName, egressId: event.egressInfo?.egressId },
+      {
+        event: eventName,
+        egressId: event.egressInfo?.egressId,
+        room: event.room?.name,
+      },
       "livekit webhook received",
     );
 
-    // Update local egress job cache when present
-    const egressInfo = event.egressInfo;
-    if (egressInfo?.egressId) {
-      const existing = store.getEgress(egressInfo.egressId);
-      if (existing) {
-        store.putEgress({
-          ...existing,
-          status: mapEgressStatus(egressInfo),
-          error:
-            egressInfo.error && String(egressInfo.error).length > 0
-              ? String(egressInfo.error)
-              : existing.error,
-          updatedAt: new Date().toISOString(),
-        });
-      }
+    try {
+      await handleLiveKitEvent(event, eventName, store, quotas, usage, req);
+    } catch (err) {
+      req.log.error({ err, event: eventName }, "webhook handler failed");
+      // Still 200 after verify so LiveKit does not hammer retries for app bugs;
+      // durable queue is a later hardening step.
     }
 
-    // Fan-out to consumer apps (Clatters, etc.) — same raw body + auth
     if (config.webhookForwardUrls.length > 0) {
       const results = await Promise.allSettled(
         config.webhookForwardUrls.map((url) =>
@@ -103,6 +104,85 @@ export async function registerWebhookRoutes(
   });
 }
 
+async function handleLiveKitEvent(
+  event: Awaited<ReturnType<WebhookReceiver["receive"]>>,
+  eventName: string,
+  store: SessionStore,
+  quotas: QuotaTracker,
+  usage: UsageMeter | undefined,
+  req: FastifyRequest,
+): Promise<void> {
+  // --- Egress lifecycle: release quota on terminal status ---
+  const egressInfo = event.egressInfo;
+  if (egressInfo?.egressId) {
+    const existing = await store.getEgress(String(egressInfo.egressId));
+    if (existing) {
+      const status = mapEgressStatus(egressInfo);
+      let quotaHeld = existing.quotaHeld;
+      if (
+        existing.quotaHeld &&
+        !isTerminalEgressStatus(existing.status) &&
+        isTerminalEgressStatus(status)
+      ) {
+        await quotas.releaseEgress(existing.tenantId);
+        quotaHeld = false;
+        req.log.info(
+          { egressId: existing.egressId, tenantId: existing.tenantId },
+          "egress quota released via webhook",
+        );
+      }
+      await store.putEgress({
+        ...existing,
+        status,
+        quotaHeld,
+        error:
+          egressInfo.error && String(egressInfo.error).length > 0
+            ? String(egressInfo.error)
+            : existing.error,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  // --- Room finished / emptyTimeout: end Gateway session + release session quota ---
+  if (
+    eventName === "room_finished" ||
+    eventName === "room_ended" ||
+    eventName === "room.finished"
+  ) {
+    const roomName = event.room?.name ? String(event.room.name) : "";
+    if (!roomName) return;
+
+    const session = await store.getActiveByRoomName(roomName);
+    if (!session || session.status === "ended") return;
+
+    // Release any still-held egress quotas for this session
+    for (const job of await store.listEgress(session.sessionId)) {
+      if (job.quotaHeld && !isTerminalEgressStatus(job.status)) {
+        await quotas.releaseEgress(job.tenantId);
+        await store.putEgress({
+          ...job,
+          status: "complete",
+          quotaHeld: false,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    const ended = await store.end(session.sessionId);
+    await quotas.releaseSession(session.tenantId);
+    usage?.recordSessionEnded({
+      startedAt: session.createdAt,
+      endedAt: ended?.endedAt ?? undefined,
+      assumedViewers: session.maxParticipants,
+    });
+    req.log.info(
+      { sessionId: session.sessionId, roomName, tenantId: session.tenantId },
+      "session ended via room_finished webhook",
+    );
+  }
+}
+
 function getRawBody(req: FastifyRequest): string {
   if (typeof req.rawBody === "string" && req.rawBody.length > 0) {
     return req.rawBody;
@@ -111,7 +191,6 @@ function getRawBody(req: FastifyRequest): string {
     return req.body;
   }
   if (req.body && typeof req.body === "object") {
-    // Last resort — verification may fail if re-serialized
     return JSON.stringify(req.body);
   }
   return "";
@@ -119,24 +198,22 @@ function getRawBody(req: FastifyRequest): string {
 
 async function forwardWebhook(
   url: string,
-  rawBody: string,
+  body: string,
   authorization: string,
   log: FastifyRequest["log"],
 ): Promise<void> {
   const res = await fetch(url, {
     method: "POST",
     headers: {
-      "content-type": "application/webhook+json",
-      authorization,
+      "Content-Type": "application/webhook+json",
+      Authorization: authorization.startsWith("Bearer ")
+        ? authorization
+        : `Bearer ${authorization}`,
     },
-    body: rawBody,
+    body,
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    log.warn(
-      { url, status: res.status, body: text.slice(0, 200) },
-      "webhook forward non-OK",
-    );
+    log.warn({ url, status: res.status }, "webhook forward non-2xx");
     throw new Error(`forward ${url} → ${res.status}`);
   }
 }

@@ -1,0 +1,46 @@
+name: Compose config and images
+
+on:
+  push:
+    paths:
+      - "deploy/compose/**"
+      - "deploy/docker/**"
+      - ".github/workflows/compose-images.yml"
+  pull_request:
+    paths:
+      - "deploy/compose/**"
+      - "deploy/docker/**"
+      - ".github/workflows/compose-images.yml"
+  workflow_dispatch:
+
+jobs:
+  compose-validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deploy/compose
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Compose
+        run: docker compose version
+
+      - name: Validate compose files
+        run: |
+          cp ../env/media.env.example .env
+          docker compose config -q
+          docker compose --profile turn config -q
+          docker compose --profile full config -q
+
+      - name: Verify referenced images exist (manifest)
+        run: |
+          set -euo pipefail
+          cp ../env/media.env.example .env
+          images=$(docker compose config --images | sort -u)
+          echo "Images:"
+          echo "$images"
+          while IFS= read -r img; do
+            [ -z "$img" ] && continue
+            echo "Checking $img"
+            docker manifest inspect "$img" >/dev/null
+          done <<< "$images"

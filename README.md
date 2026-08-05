@@ -19,12 +19,13 @@ Replace managed LiveKit Cloud for realtime cost control. Keep client LiveKit SDK
 |------:|--------|
 | 0 Foundation | ✅ |
 | **1 Media plane parity** | **✅ Complete** (local live + Echo to MinIO verified) |
-| **2 Gateway + dual-run** | **🔄 In progress** — platform ready; Clatters staging dual-run next |
+| **2 Gateway + dual-run** | **🔄 In progress** — admin/SDK/cost plane; consumer dual-run later |
 | **3 Market-grade audience** | **🔄 3a–d done** — coturn, HLS egress, multi-tenant quotas, CDN templates |
-| 4 Production cutover | ⏳ |
+| 4 Production cutover | ⏳ economic plane first for cost claims |
 | 5 Harden | ⏳ |
 
-See [docs/roadmap/phased-delivery.md](docs/roadmap/phased-delivery.md), [docs/architecture/market-grade-product.md](docs/architecture/market-grade-product.md), and [docs/operations/turn-hls-cdn.md](docs/operations/turn-hls-cdn.md).
+**Planes (ADR-009):** GCP public SFU = **demo plane** (no cost marketing). **Economic production plane** = bandwidth-cheap origin ± CDN — only path for LiveKit Cloud savings.  
+See [docs/operations/cost-posture-and-planes.md](docs/operations/cost-posture-and-planes.md), [docs/roadmap/cost-product-implementation-plan.md](docs/roadmap/cost-product-implementation-plan.md).
 
 ---
 
@@ -72,6 +73,7 @@ live-streaming-platform/   # working directory name; product = SoftQraft Realtim
 ├── docs/
 ├── services/gateway-api/  # @softqraft/gateway-api
 ├── packages/shared/       # @softqraft/shared
+├── packages/sdk/          # @softqraft/sdk (backend Gateway client)
 ├── deploy/
 ├── scripts/
 ├── examples/              # consumer adapters only

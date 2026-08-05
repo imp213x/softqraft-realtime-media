@@ -38,6 +38,18 @@ Your players ──HLS────► CDN (URL from Gateway playback)
 | Post-session MP4/VOD | `recording_only` or combine with a live profile |
 | Clatters-like Live + Echo | `creator_live_webrtc` + file recording (see consumer inventory) |
 
+### Cost honesty (planes)
+
+Self-host ≠ automatic savings vs LiveKit Cloud. See [ADR-009](../decisions/ADR-009-cost-planes-and-hosting-posture.md).
+
+| Plane | When |
+|-------|------|
+| **Demo** | Product integration on any host (incl. GCP) — do not claim Cloud $ savings |
+| **Economic production** | Bandwidth-cheap origin; only then claim transfer savings |
+| **Scale** | Use `hybrid_live` / HLS + CDN for large passive audiences |
+
+Admin meta exposes `deploymentPlane`, `hostingCostClass`, `costClaimsAllowed`.
+
 ## Room naming strategies
 
 | Strategy | When |

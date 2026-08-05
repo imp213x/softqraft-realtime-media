@@ -24,9 +24,29 @@ services:
       timeout: 3s
       retries: 10
 
+  # Durable sessions / egress / idempotency (hardening #3)
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-softqraft}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-softqraft}
+      POSTGRES_DB: ${POSTGRES_DB:-softqraft_gateway}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-softqraft} -d ${POSTGRES_DB:-softqraft_gateway}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   livekit:
-    # Clatters livekit-client 2.19 expects /rtc/v1 (protocol 17). Use recent server.
-    image: livekit/livekit-server:v1.13.5
+    # Clatters livekit-client 2.19 expects /rtc/v1 (protocol 17).
+    # Pin a Docker Hub–published patch (v1.13.5 was not consistently published).
+    # CI: .github/workflows/compose-images.yml
+    image: livekit/livekit-server:v1.13.4
     restart: unless-stopped
     depends_on:
       redis:
@@ -156,45 +176,59 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     env_file:
       - path: .env
         required: false
     environment:
+      # Values from deploy/compose/.env (env_file) unless overridden below.
+      # Docker-internal service names MUST win over host-oriented .env values.
       GATEWAY_HOST: 0.0.0.0
       GATEWAY_PORT: 8080
       GATEWAY_SERVICE_API_KEYS: ${GATEWAY_SERVICE_API_KEYS:-dev-local-key}
-      # In-container service DNS (do not use localhost here)
+      GATEWAY_ADMIN_TOKEN: ${GATEWAY_ADMIN_TOKEN:-}
+      GATEWAY_TENANTS: ${GATEWAY_TENANTS:-}
+      PUBLIC_GATEWAY_URL: ${PUBLIC_GATEWAY_URL:-}
+      # Always in-cluster LiveKit HTTP (do not use public IP / localhost here)
       LIVEKIT_URL: http://livekit:7880
-      # Client-facing URL returned in tokens (browser on host)
+      # Browser-facing WSS (set in .env to wss://realtime.softqraftlabs.com)
       LIVEKIT_REALTIME_URL: ${LIVEKIT_REALTIME_URL:-ws://localhost:7880}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-softqraft_dev_key}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-softqraft_dev_secret_change_me_before_prod}
+      # Always in-cluster Redis (ignore REDIS_URL=localhost from host-oriented .env)
       REDIS_URL: redis://redis:6379
+      DATABASE_URL: ${DATABASE_URL:-postgres://softqraft:softqraft@postgres:5432/softqraft_gateway}
+      QUOTA_BACKEND: ${QUOTA_BACKEND:-redis}
+      TENANT_STORE_PATH: ${TENANT_STORE_PATH:-/data/tenants.json}
+      # S3/R2 — allow .env to override MinIO defaults (was hardcoded minio; broke R2)
       S3_BUCKET_NAME: ${S3_BUCKET_NAME:-sqrm-recordings}
       AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-softqraft}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-softqraftsecret}
-      S3_ENDPOINT: http://minio:9000
-      S3_FORCE_PATH_STYLE: "true"
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
       RECORDING_KEY_TEMPLATE: ${RECORDING_KEY_TEMPLATE:-recordings/{externalId}/{sessionId}-{time}.mp4}
       HLS_KEY_TEMPLATE: ${HLS_KEY_TEMPLATE:-hls/{externalId}/{sessionId}}
       HLS_PUBLIC_BASE_URL: ${HLS_PUBLIC_BASE_URL:-http://localhost:9000/sqrm-recordings}
       CDN_PUBLIC_BASE_URL: ${CDN_PUBLIC_BASE_URL:-}
-      # Multi-tenant: tenantId:apiKey:maxSessions:maxEgress (comma-separated)
-      # Example: clatters:dev-local-key:50:10,demo:demo-key:20:5
-      GATEWAY_TENANTS: ${GATEWAY_TENANTS:-}
-      # TURN iceServers for *browsers* — must be a host the client can reach
-      # (LAN IP or 127.0.0.1). start-local-live.ps1 sets TURN_HOST from LAN IP.
       TURN_ENABLED: ${TURN_ENABLED:-true}
       TURN_HOST: ${TURN_HOST:-127.0.0.1}
       TURN_PORT: ${TURN_PORT:-3478}
       TURN_USERNAME: ${TURN_USERNAME:-softqraft}
       TURN_PASSWORD: ${TURN_PASSWORD:-softqraftturn}
       TURN_URLS: ${TURN_URLS:-}
-      # Comma-separated consumer webhook URLs (e.g. Clatters Echo finalize)
       WEBHOOK_FORWARD_URLS: ${WEBHOOK_FORWARD_URLS:-}
+      DEPLOYMENT_PLANE: ${DEPLOYMENT_PLANE:-demo}
+      HOSTING_COST_CLASS: ${HOSTING_COST_CLASS:-hyperscaler_list_egress}
+      TOKEN_TTL_SECONDS: ${TOKEN_TTL_SECONDS:-600}
+      STUN_URLS: ${STUN_URLS:-stun:stun.l.google.com:19302}
+    volumes:
+      - gateway_data:/data
     ports:
       - "8080:8080"
 
 volumes:
   minio_data:
+  postgres_data:
+  gateway_data:

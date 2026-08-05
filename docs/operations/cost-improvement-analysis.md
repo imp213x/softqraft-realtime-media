@@ -1,15 +1,20 @@
 # Cost improvement analysis — LiveKit Cloud vs SoftQraft self-host
 
-**Date:** 2026-08-02  
+**Date:** 2026-08-02 · **Updated:** 2026-08-04  
 **Product:** SoftQraft Realtime Media  
-**Context:** Clatters currently pays LiveKit Cloud for realtime + Cloud Egress; Echo files already go to AWS S3.
+**Context:** Cost thesis vs LiveKit Cloud + Egress.  
+**Normative posture:** [cost-posture-and-planes.md](cost-posture-and-planes.md) · [ADR-009](../decisions/ADR-009-cost-planes-and-hosting-posture.md)
+
+**Decision for you:** GCP public SFU = **demo plane** (no cost marketing).  
+**Economic production plane** = bandwidth-cheap origin (± HLS/CDN) only for ROI claims.
 
 **Status of savings today**
 
 | Environment | Media bill impact |
 |-------------|-------------------|
 | Local dual-run (MinIO) | **$0** LiveKit Cloud for those sessions (dev only) |
-| Production cutover (not done yet) | Savings **start only after** prod points at SoftQraft |
+| Public GCP SoftQraft | Product proof only — **egress $/GB ≈ Cloud** |
+| Economic plane cutover | Savings start when traffic uses **cheap-bandwidth** host |
 | Echo object storage | **Unchanged** if still AWS S3 (ADR-006) |
 
 This document estimates **production** savings once SoftQraft carries realtime traffic. Numbers use public LiveKit Cloud list rates (Ship/Scale-class: **~$0.10–$0.12/GB** downstream after included allowance; connection minutes are secondary). Hosting examples use **cheap-bandwidth EU VPS/bare metal** (order-of-magnitude; not a quote).

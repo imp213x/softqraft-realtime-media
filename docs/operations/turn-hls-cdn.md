@@ -16,6 +16,8 @@ This runbook covers the four layers that make SoftQraft “market grade others w
 
 ## 3a — coturn TURN
 
+**Maturity:** Pilot-grade. Static username/password is returned to every client and can be abused until rotated. TURN/TLS (domain + certs; not only port 5349) and time-limited credentials are required before broad production. See [platform-maturity-assessment.md](platform-maturity-assessment.md) §8.
+
 ### Compose profiles
 
 ```powershell

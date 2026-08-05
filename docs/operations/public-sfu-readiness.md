@@ -1,9 +1,12 @@
 # Public SFU readiness (no Echo / no HLS)
 
 **Status:** Interactive WebRTC live proven on GCP · H1–H6 ✅ (2026-08-04)  
+**Plane:** **Product demo plane** (ADR-009) — not economic production  
 **Product slice:** Self-host LiveKit + Gateway — not LiveKit Cloud  
-**Next product:** Admin console + API credentials — see [product-plan.md](../product/product-plan.md)  
-**Deferred:** Echo (MP4), HLS/CDN audience scale  
+**Cost claim:** Do **not** market GCP demo as cheaper than LiveKit Cloud (hyperscaler egress)  
+**Next product:** Admin + public SDK — see [product-plan.md](../product/product-plan.md)  
+**Economic plane:** [cost-posture-and-planes.md](cost-posture-and-planes.md) · [economic-plane-runbook.md](economic-plane-runbook.md)  
+**Deferred:** Echo (MP4), HLS/CDN audience scale (R4 cost product) 
 
 ## Proven
 

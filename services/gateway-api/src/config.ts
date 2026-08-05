@@ -58,6 +58,23 @@ export interface GatewayConfig {
   tenantStorePath: string;
   /** Public HTTPS base for Admin UI meta (e.g. https://media.softqraftlabs.com) */
   publicGatewayUrl: string;
+  /**
+   * Deployment plane (ADR-009).
+   * demo = product proof (e.g. GCP); economic_production = cost-claimable host.
+   */
+  deploymentPlane: "demo" | "economic_production";
+  /** Host egress class for cost honesty */
+  hostingCostClass: "hyperscaler_list_egress" | "bandwidth_cheap" | "unknown";
+  /**
+   * Postgres URL for durable sessions/egress/idempotency.
+   * Empty → in-memory store (single-node only).
+   */
+  databaseUrl: string;
+  /**
+   * Quota backend: memory | redis | auto
+   * auto = redis when DATABASE_URL set or QUOTA_BACKEND=redis, else memory
+   */
+  quotaBackend: "memory" | "redis";
 }
 
 function env(name: string, fallback = ""): string {
@@ -219,7 +236,50 @@ export function loadConfig(): GatewayConfig {
       pathDefaultTenantStore(),
     ),
     publicGatewayUrl: env("PUBLIC_GATEWAY_URL").replace(/\/$/, ""),
+    deploymentPlane: parseDeploymentPlane(env("DEPLOYMENT_PLANE", "demo")),
+    hostingCostClass: parseHostingCostClass(
+      env("HOSTING_COST_CLASS", "unknown"),
+    ),
+    databaseUrl: env("DATABASE_URL"),
+    quotaBackend: parseQuotaBackend(
+      env("QUOTA_BACKEND", "auto"),
+      Boolean(env("DATABASE_URL")),
+    ),
   };
+}
+
+function parseQuotaBackend(
+  raw: string,
+  hasDatabase: boolean,
+): "memory" | "redis" {
+  const v = raw.toLowerCase();
+  if (v === "memory") return "memory";
+  if (v === "redis") return "redis";
+  // auto: prefer redis when durable DB is configured (multi-instance path)
+  return hasDatabase ? "redis" : "memory";
+}
+
+function parseDeploymentPlane(
+  raw: string,
+): "demo" | "economic_production" {
+  const v = raw.toLowerCase().replace(/-/g, "_");
+  if (v === "economic_production" || v === "economic" || v === "production") {
+    return "economic_production";
+  }
+  return "demo";
+}
+
+function parseHostingCostClass(
+  raw: string,
+): "hyperscaler_list_egress" | "bandwidth_cheap" | "unknown" {
+  const v = raw.toLowerCase().replace(/-/g, "_");
+  if (v === "hyperscaler_list_egress" || v === "hyperscaler") {
+    return "hyperscaler_list_egress";
+  }
+  if (v === "bandwidth_cheap" || v === "cheap") {
+    return "bandwidth_cheap";
+  }
+  return "unknown";
 }
 
 function pathDefaultTenantStore(): string {

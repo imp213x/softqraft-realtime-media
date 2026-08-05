@@ -6,20 +6,36 @@
 
 ## Goal
 
-Ship a **market-ready interactive live SFU** that apps integrate via HTTP + LiveKit SDKs — without LiveKit Cloud billing for media.
+Ship a **market-ready interactive live SFU** that apps integrate via HTTP + LiveKit SDKs — and can **cut media cost vs LiveKit Cloud** when deployed on the **economic production plane**.
+
+## Decision for you (planes)
+
+| Plane | Host example | Purpose |
+|-------|--------------|---------|
+| **Product demo** | Current GCP public SFU | Product proof, admin, SDK — **not** cost claims |
+| **Economic production** | Bandwidth-cheap VPS/metal ± CDN | Real traffic ROI vs LiveKit Cloud |
+
+See [ADR-009](../decisions/ADR-009-cost-planes-and-hosting-posture.md), [cost-posture-and-planes.md](../operations/cost-posture-and-planes.md).
 
 ## Current status (shippable beta)
 
 | Layer | Status |
 |-------|--------|
-| Interactive WebRTC (host / guest / viewer) | ✅ Proven public GCP |
+| Interactive WebRTC (host / guest / viewer) | ✅ Proven public GCP (**demo plane**) |
 | Gateway sessions + tokens + ICE | ✅ |
 | TLS + domain (`media` / `realtime.softqraftlabs.com`) | ✅ H2 |
 | coturn TURN | ✅ H3 |
 | Secrets + firewall + static IP + monitoring | ✅ H4–H6 |
-| Admin GUI + API credential generation | 🔄 building |
-| Echo / MP4 recording | ⏸ deferred (cost/complexity) |
-| HLS + R2/CDN (large audience) | ⏸ when scale needed |
+| Cost posture docs + dual-plane decision | ✅ ADR-009 |
+| Admin GUI + credentials + usage + plane honesty | ✅ beta |
+| Usage metering (in-process) | ✅ beta (not durable) |
+| Public Node SDK `@softqraft/sdk` | ✅ scaffold |
+| Hardening inventory (10 findings) | ✅ documented |
+| LiveKit image pin + compose CI | ✅ |
+| Cross-tenant room adopt fix | ✅ |
+| Economic plane deploy runbook | 🔄 draft |
+| Echo / MP4 recording | ⏸ deferred |
+| HLS + CDN (scale cost product) | ⏸ R4 when scale |
 | Session durability (DB) | ⏸ H7 later |
 
 ## Architecture (product)
@@ -42,12 +58,16 @@ Integrating app
 
 | ID | Slice | Priority |
 |----|--------|----------|
-| **P0** | Admin GUI + credential generate/revoke | Now |
-| **P1** | Integration docs + copy-paste snippets | With P0 |
-| **P2** | First consumer dual-run (e.g. Clatters live-only) | Next |
-| **P3** | H7 session store persistence | When multi-gateway / restarts hurt |
-| **P4** | H8 HLS + R2/CDN | Large passive audiences |
+| **P0** | Admin GUI + credentials + plane/usage honesty | Now (R1) |
+| **P1** | Public SDK surface + integration docs | With P0 |
+| **P1b** | Economic plane ops (host + flags + dual DNS) | Parallel R2 |
+| **P1c** | Usage metering (persist later) | R3 before cutover |
+| **P2** | First consumer dual-run (optional; after economic plane) | Later |
+| **P3** | H7 session store persistence | Multi-gateway |
+| **P4** | H8 HLS + CDN as **cost product** | Scale (R4) |
 | **P5** | H9 Echo / VOD | When product requires replay |
+
+Plan detail: [cost-product-implementation-plan.md](../roadmap/cost-product-implementation-plan.md).
 
 ## Non-goals (near term)
 

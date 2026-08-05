@@ -27,4 +27,8 @@ Media cost is dominated by **egress bytes** and **managed per-minute/GB pricing*
 
 - Ops team owns UDP, TLS, TURN, capacity.  
 - Compose-first, not EKS-first.  
-- CDN configuration is part of the product, not an afterthought.
+- CDN configuration is part of the product, not an afterthought.  
+
+**Clarification (2026-08-04):** A **demo plane** may temporarily run on GCP for product proof.  
+**Cost claims** require the **economic production plane** on bandwidth-cheap hosts.  
+See [ADR-009](ADR-009-cost-planes-and-hosting-posture.md).

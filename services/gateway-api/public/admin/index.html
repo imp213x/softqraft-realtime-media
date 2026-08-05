@@ -14,6 +14,7 @@
         --muted: #9fb3d1;
         --accent: #2563eb;
         --danger: #b91c1c;
+        --warn: #b45309;
         --ok: #059669;
         font-family: system-ui, Segoe UI, sans-serif;
       }
@@ -55,7 +56,7 @@
         color: var(--muted);
         margin-bottom: 0.25rem;
       }
-      input, button, select {
+      input, button, select, textarea {
         width: 100%;
         border-radius: 8px;
         border: 1px solid #334155;
@@ -72,7 +73,20 @@
         margin-top: 0.5rem;
       }
       button.secondary { background: #1e293b; border-color: #334155; }
-      button.danger { background: var(--danger); border-color: var(--danger); width: auto; margin: 0; padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+      button.danger {
+        background: var(--danger);
+        border-color: var(--danger);
+        width: auto;
+        margin: 0;
+        padding: 0.35rem 0.6rem;
+        font-size: 0.8rem;
+      }
+      button.inline {
+        width: auto;
+        margin: 0;
+        padding: 0.3rem 0.55rem;
+        font-size: 0.75rem;
+      }
       .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
       @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
       .muted { color: var(--muted); font-size: 0.85rem; line-height: 1.45; }
@@ -84,17 +98,69 @@
         padding: 0.75rem 1rem;
         border-radius: 8px;
         display: none;
+        margin-top: 0.75rem;
       }
       .banner.show { display: block; }
-      .banner code { user-select: all; }
+      .banner.warn {
+        background: #422006;
+        border-color: #b45309;
+        color: #fde68a;
+      }
+      .banner.info {
+        background: #0c1a33;
+        border-color: #1e3a5f;
+        color: #bfdbfe;
+      }
       table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
       th, td { text-align: left; padding: 0.5rem 0.35rem; border-bottom: 1px solid var(--border); vertical-align: top; }
       th { color: var(--muted); font-weight: 500; font-size: 0.75rem; }
       .err { color: #fca5a5; font-size: 0.85rem; min-height: 1.2em; }
-      .ok { color: #6ee7b7; }
-      .meta { display: grid; gap: 0.35rem; }
-      .meta div { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-      .meta span { color: var(--muted); min-width: 7rem; }
+      .meta { display: grid; gap: 0.45rem; }
+      .meta-row {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .meta-row span { color: var(--muted); min-width: 7rem; font-size: 0.8rem; }
+      .chip {
+        display: inline-block;
+        padding: 0.15rem 0.45rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      .chip.demo { background: #422006; color: #fcd34d; }
+      .chip.econ { background: #052e1c; color: #6ee7b7; }
+      .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.65rem; }
+      .presets { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem; }
+      pre.snippet {
+        white-space: pre-wrap;
+        margin: 0;
+        background: #0f172a;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.75rem;
+        max-height: 280px;
+        overflow: auto;
+      }
+      .tabs { display: flex; gap: 0.35rem; margin-bottom: 0.65rem; flex-wrap: wrap; }
+      .tabs button { margin-top: 0; width: auto; padding: 0.35rem 0.65rem; font-size: 0.8rem; }
+      .tabs button.active { outline: 1px solid #60a5fa; }
+      .usage-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 0.65rem;
+      }
+      .usage-grid div {
+        background: #0f172a;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.55rem 0.65rem;
+      }
+      .usage-grid strong { display: block; font-size: 1.05rem; margin-top: 0.15rem; }
     </style>
   </head>
   <body>
@@ -105,21 +171,48 @@
     <main>
       <section class="card" id="loginCard">
         <h2>Admin access</h2>
-        <p class="muted">Uses <code>GATEWAY_ADMIN_TOKEN</code>. Not the LiveKit or tenant API keys.</p>
+        <p class="muted">Uses <code>GATEWAY_ADMIN_TOKEN</code>. Not LiveKit or tenant API keys.</p>
         <label>Admin token</label>
         <input id="adminToken" type="password" autocomplete="current-password" placeholder="Bearer secret" />
         <button id="btnLogin" type="button">Unlock console</button>
         <p class="err" id="loginErr"></p>
       </section>
 
+      <section class="card" id="planeCard" style="display: none">
+        <h2>Deployment plane</h2>
+        <div id="planeBanner" class="banner info show"></div>
+        <p class="muted" style="margin-top: 0.75rem">
+          <strong>Decision:</strong> GCP public SFU = <em>product demo plane</em>.
+          Cost claims vs LiveKit Cloud only on <em>economic production plane</em>
+          (bandwidth-cheap origin ± HLS/CDN). ADR-009.
+        </p>
+      </section>
+
       <section class="card" id="appCard" style="display: none">
         <h2>Integration endpoints</h2>
         <div class="meta mono" id="metaBox"></div>
-        <button type="button" class="secondary" id="btnLogout">Lock console</button>
+        <div class="actions">
+          <button type="button" class="secondary inline" id="btnCopyGw">Copy gateway URL</button>
+          <button type="button" class="secondary inline" id="btnCopyRt">Copy realtime URL</button>
+          <button type="button" class="secondary" id="btnLogout">Lock console</button>
+        </div>
+      </section>
+
+      <section class="card" id="usageCard" style="display: none">
+        <h2>Usage (since Gateway start)</h2>
+        <div class="usage-grid" id="usageGrid"></div>
+        <p class="muted" id="usageNote" style="margin-top: 0.65rem"></p>
+        <button type="button" class="secondary" id="btnUsage">Refresh usage</button>
       </section>
 
       <section class="card" id="createCard" style="display: none">
         <h2>Generate credential</h2>
+        <p class="muted">Full API key shown <strong>once</strong>. Store server-side only.</p>
+        <div class="presets">
+          <button type="button" class="secondary inline" data-preset="demo-app">demo-app</button>
+          <button type="button" class="secondary inline" data-preset="staging">staging</button>
+          <button type="button" class="secondary inline" data-preset="production">production</button>
+        </div>
         <div class="row">
           <div>
             <label>Tenant id (app / customer)</label>
@@ -145,21 +238,25 @@
         <div class="banner" id="createdBanner">
           <strong>Copy now — full key shown once</strong>
           <div class="mono" style="margin-top: 0.5rem" id="createdKey"></div>
+          <div class="actions">
+            <button type="button" class="secondary inline" id="btnCopyKey">Copy API key</button>
+            <button type="button" class="secondary inline" id="btnCopyEnv">Copy env snippet</button>
+          </div>
           <div class="muted" style="margin-top: 0.5rem" id="createdHint"></div>
         </div>
       </section>
 
       <section class="card" id="listCard" style="display: none">
-        <h2>Credentials</h2>
+        <h2>Tenants &amp; keys (hashed at rest)</h2>
+        <p class="muted">Keys use format <code>sqk_{keyId}.{secret}</code>. Disk stores SHA-256 only. Rotate issues a new key and revokes previous active keys.</p>
         <button type="button" class="secondary" id="btnRefresh">Refresh</button>
         <div style="overflow-x: auto; margin-top: 0.75rem">
           <table>
             <thead>
               <tr>
                 <th>Tenant</th>
-                <th>Key</th>
+                <th>Keys</th>
                 <th>Quotas</th>
-                <th>Created</th>
                 <th></th>
               </tr>
             </thead>
@@ -169,14 +266,43 @@
         <p class="err" id="listErr"></p>
       </section>
 
+      <section class="card" id="auditCard" style="display: none">
+        <h2>Audit log</h2>
+        <button type="button" class="secondary" id="btnAudit">Refresh audit</button>
+        <div style="overflow-x: auto; margin-top: 0.75rem">
+          <table>
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Action</th>
+                <th>Tenant</th>
+                <th>Key</th>
+                <th>Detail</th>
+              </tr>
+            </thead>
+            <tbody id="auditBody"></tbody>
+          </table>
+        </div>
+        <p class="err" id="auditErr"></p>
+      </section>
+
       <section class="card" id="docsCard" style="display: none">
-        <h2>App integration (minimal)</h2>
-        <pre class="mono muted" id="snippet" style="white-space: pre-wrap; margin: 0"></pre>
+        <h2>Integration snippets</h2>
+        <div class="tabs">
+          <button type="button" class="secondary active" data-tab="curl">curl</button>
+          <button type="button" class="secondary" data-tab="env">env</button>
+          <button type="button" class="secondary" data-tab="cost">cost profiles</button>
+        </div>
+        <pre class="mono muted snippet" id="snippet"></pre>
+        <button type="button" class="secondary inline" id="btnCopySnippet" style="margin-top: 0.5rem">Copy snippet</button>
       </section>
     </main>
     <script>
       const el = (id) => document.getElementById(id);
       const base = () => location.origin.replace(/\/$/, "");
+      let metaCache = null;
+      let lastApiKey = "";
+      let snippetTab = "curl";
 
       function token() {
         return sessionStorage.getItem("sq_admin_token") || "";
@@ -185,6 +311,15 @@
       function setToken(t) {
         if (t) sessionStorage.setItem("sq_admin_token", t);
         else sessionStorage.removeItem("sq_admin_token");
+      }
+
+      async function copyText(text) {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch {
+          return false;
+        }
       }
 
       async function api(path, { method = "GET", body } = {}) {
@@ -205,32 +340,101 @@
 
       function showApp(on) {
         el("loginCard").style.display = on ? "none" : "block";
-        ["appCard", "createCard", "listCard", "docsCard"].forEach((id) => {
+        ["planeCard", "appCard", "usageCard", "createCard", "listCard", "auditCard", "docsCard"].forEach((id) => {
           el(id).style.display = on ? "block" : "none";
         });
       }
 
-      async function loadMeta() {
-        const m = await api("/admin/v1/meta");
-        el("metaBox").innerHTML = `
-          <div><span>Gateway</span><code>${m.publicGatewayUrl}</code></div>
-          <div><span>Realtime</span><code>${m.realtimeUrl}</code></div>
-          <div><span>Tenants</span><code>${m.tenantCount}</code></div>`;
-        el("statusLine").textContent = "Admin unlocked";
-        el("snippet").textContent = `POST ${m.publicGatewayUrl}/v1/sessions
+      function planeChip(plane) {
+        const econ = plane === "economic_production";
+        return `<span class="chip ${econ ? "econ" : "demo"}">${econ ? "economic production" : "demo"}</span>`;
+      }
+
+      function renderSnippets() {
+        if (!metaCache) return;
+        const gw = metaCache.publicGatewayUrl;
+        const rt = metaCache.realtimeUrl;
+        if (snippetTab === "env") {
+          el("snippet").textContent = `# SoftQraft Gateway (app backend only)
+SOFTQRAFT_GATEWAY_URL=${gw}
+SOFTQRAFT_API_KEY=<apiKey from create>
+
+# Clients use realtimeUrl + token from Gateway token response
+# LIVEKIT_URL is not required in the app if you mint via Gateway`;
+          return;
+        }
+        if (snippetTab === "cost") {
+          const lines = (metaCache.costProfiles || [])
+            .map((p) => `${p.profile}\n  path: ${p.audiencePath}\n  note: ${p.costNote}`)
+            .join("\n\n");
+          el("snippet").textContent =
+            `Plane: ${metaCache.deploymentPlane}\nHost class: ${metaCache.hostingCostClass}\nClaims allowed: ${metaCache.costClaimsAllowed}\n\n` +
+            (lines || "No profiles");
+          return;
+        }
+        el("snippet").textContent = `POST ${gw}/v1/sessions
 Authorization: Bearer <apiKey>
 Content-Type: application/json
 
-{ "externalId": "show-1", "profile": "creator_live_webrtc" }
+{
+  "externalId": "show-1",
+  "profile": "creator_live_webrtc",
+  "realtime": { "maxParticipants": 50 }
+}
 
-POST ${m.publicGatewayUrl}/v1/sessions/{sessionId}/tokens
+POST ${gw}/v1/sessions/{sessionId}/tokens
 Authorization: Bearer <apiKey>
 
 { "identity": "host-1", "role": "host" }
 
-// Client: LiveKit room.connect(realtimeUrl, token, { rtcConfig: { iceServers } })
-// realtimeUrl + iceServers come from the token response`;
+# Client (LiveKit SDK)
+# room.connect(realtimeUrl, token, { rtcConfig: { iceServers } })
+# realtimeUrl default: ${rt}
+# iceServers from token response when TURN is configured`;
+      }
+
+      async function loadMeta() {
+        const m = await api("/admin/v1/meta");
+        metaCache = m;
+        const plane = m.deploymentPlane || "demo";
+        el("planeBanner").className =
+          "banner show " + (m.costClaimsAllowed ? "info" : "warn");
+        el("planeBanner").innerHTML = `
+          ${planeChip(plane)}
+          <span style="margin-left:0.5rem">${escapeHtml(m.hostingCostClass || "unknown")}</span>
+          <div style="margin-top:0.5rem">${escapeHtml(m.costClaimNote || "")}</div>`;
+        el("metaBox").innerHTML = `
+          <div class="meta-row"><span>Gateway</span><code id="metaGw">${escapeHtml(m.publicGatewayUrl)}</code></div>
+          <div class="meta-row"><span>Realtime</span><code id="metaRt">${escapeHtml(m.realtimeUrl)}</code></div>
+          <div class="meta-row"><span>Tenants</span><code>${m.tenantCount}</code></div>
+          <div class="meta-row"><span>Plane</span>${planeChip(plane)}</div>`;
+        el("statusLine").textContent = "Admin unlocked · " + plane;
+        renderSnippets();
         return m;
+      }
+
+      async function loadUsage() {
+        try {
+          const data = await api("/admin/v1/usage");
+          const u = data.usage || {};
+          const cells = [
+            ["Sessions created", u.sessionsCreated],
+            ["Active", u.sessionsActive],
+            ["Session minutes", u.sessionMinutes],
+            ["Tokens minted", u.tokensMinted],
+            ["Egress started", u.egressJobsStarted],
+            ["GB proxy", u.estimatedDownstreamGbProxy],
+          ];
+          el("usageGrid").innerHTML = cells
+            .map(
+              ([k, v]) =>
+                `<div><span class="muted">${escapeHtml(k)}</span><strong>${escapeHtml(String(v ?? "—"))}</strong></div>`,
+            )
+            .join("");
+          el("usageNote").textContent = data.note || "";
+        } catch (err) {
+          el("usageNote").textContent = err.message || String(err);
+        }
       }
 
       async function loadList() {
@@ -239,26 +443,45 @@ Authorization: Bearer <apiKey>
           const data = await api("/admin/v1/credentials");
           const body = el("credBody");
           body.innerHTML = "";
-          if (!data.items?.length) {
-            body.innerHTML = `<tr><td colspan="5" class="muted">No credentials yet</td></tr>`;
+          const tenants = data.tenants || [];
+          if (!tenants.length) {
+            body.innerHTML = `<tr><td colspan="4" class="muted">No tenants yet</td></tr>`;
             return;
           }
-          for (const c of data.items) {
+          for (const t of tenants) {
             const tr = document.createElement("tr");
+            const keyLines = (t.keys || [])
+              .map(
+                (k) =>
+                  `<div class="mono" style="margin-bottom:0.25rem">${escapeHtml(k.keyPrefix)} <span class="muted">[${escapeHtml(k.status)}]</span><br/><span class="muted">${escapeHtml(k.keyId)}</span></div>`,
+              )
+              .join("") || '<span class="muted">no keys</span>';
             tr.innerHTML = `
-              <td><strong>${escapeHtml(c.tenantId)}</strong><br/><span class="muted">${escapeHtml(c.label || "")}</span>
-              ${c.managed ? "" : '<br/><span class="muted">env bootstrap</span>'}</td>
-              <td class="mono">${escapeHtml(c.apiKeyPreview)}</td>
-              <td class="muted">sess ${c.maxSessions} · egress ${c.maxEgress}</td>
-              <td class="muted">${c.createdAt ? new Date(c.createdAt).toLocaleString() : "—"}</td>
-              <td></td>`;
-            if (c.managed) {
-              const btn = document.createElement("button");
-              btn.type = "button";
-              btn.className = "danger";
-              btn.textContent = "Revoke";
-              btn.onclick = () => revoke(c.tenantId);
-              tr.lastElementChild.appendChild(btn);
+              <td><strong>${escapeHtml(t.tenantId)}</strong><br/><span class="muted">${escapeHtml(t.label || "")}</span>
+              ${t.managed ? "" : '<br/><span class="muted">env bootstrap</span>'}</td>
+              <td>${keyLines}</td>
+              <td class="muted">sess ${t.maxSessions} · egress ${t.maxEgress}</td>
+              <td class="actions" style="margin:0"></td>`;
+            const actions = tr.lastElementChild;
+            if (t.managed) {
+              const btnRot = document.createElement("button");
+              btnRot.type = "button";
+              btnRot.className = "secondary inline";
+              btnRot.textContent = "Rotate";
+              btnRot.onclick = () => rotate(t.tenantId);
+              actions.appendChild(btnRot);
+              const btnAdd = document.createElement("button");
+              btnAdd.type = "button";
+              btnAdd.className = "secondary inline";
+              btnAdd.textContent = "Add key";
+              btnAdd.onclick = () => addKey(t.tenantId);
+              actions.appendChild(btnAdd);
+              const btnRev = document.createElement("button");
+              btnRev.type = "button";
+              btnRev.className = "danger";
+              btnRev.textContent = "Revoke all";
+              btnRev.onclick = () => revoke(t.tenantId);
+              actions.appendChild(btnRev);
             }
             body.appendChild(tr);
           }
@@ -267,14 +490,77 @@ Authorization: Bearer <apiKey>
         }
       }
 
+      async function loadAudit() {
+        el("auditErr").textContent = "";
+        try {
+          const data = await api("/admin/v1/audit?limit=40");
+          const body = el("auditBody");
+          body.innerHTML = "";
+          if (!data.items?.length) {
+            body.innerHTML = `<tr><td colspan="5" class="muted">No audit events</td></tr>`;
+            return;
+          }
+          for (const e of data.items) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td class="muted">${e.at ? new Date(e.at).toLocaleString() : "—"}</td>
+              <td>${escapeHtml(e.action)}</td>
+              <td class="mono">${escapeHtml(e.tenantId || "")}</td>
+              <td class="mono muted">${escapeHtml(e.keyId || "")}</td>
+              <td class="muted">${escapeHtml(e.detail || "")}</td>`;
+            body.appendChild(tr);
+          }
+        } catch (err) {
+          el("auditErr").textContent = err.message || String(err);
+        }
+      }
+
       async function revoke(tenantId) {
-        if (!confirm(`Revoke credential for ${tenantId}?`)) return;
+        if (!confirm(`Revoke all keys for ${tenantId}?`)) return;
         try {
           await api(`/admin/v1/credentials/${encodeURIComponent(tenantId)}`, {
             method: "DELETE",
           });
           await loadList();
           await loadMeta();
+          await loadAudit();
+        } catch (err) {
+          el("listErr").textContent = err.message || String(err);
+        }
+      }
+
+      async function rotate(tenantId) {
+        if (!confirm(`Rotate keys for ${tenantId}? Previous active keys will be revoked.`)) return;
+        try {
+          const created = await api(
+            `/admin/v1/credentials/${encodeURIComponent(tenantId)}/rotate`,
+            { method: "POST", body: {} },
+          );
+          lastApiKey = created.apiKey;
+          el("createdKey").textContent = created.apiKey;
+          el("createdHint").textContent =
+            created.warning || "New key after rotation — store now.";
+          el("createdBanner").classList.add("show");
+          await loadList();
+          await loadAudit();
+        } catch (err) {
+          el("listErr").textContent = err.message || String(err);
+        }
+      }
+
+      async function addKey(tenantId) {
+        try {
+          const created = await api(
+            `/admin/v1/credentials/${encodeURIComponent(tenantId)}/keys`,
+            { method: "POST", body: { label: "additional" } },
+          );
+          lastApiKey = created.apiKey;
+          el("createdKey").textContent = created.apiKey;
+          el("createdHint").textContent =
+            created.warning || "Additional key — store now. Previous keys stay active.";
+          el("createdBanner").classList.add("show");
+          await loadList();
+          await loadAudit();
         } catch (err) {
           el("listErr").textContent = err.message || String(err);
         }
@@ -292,6 +578,8 @@ Authorization: Bearer <apiKey>
           await loadMeta();
           showApp(true);
           await loadList();
+          await loadUsage();
+          await loadAudit();
         } catch (err) {
           setToken("");
           showApp(false);
@@ -302,6 +590,7 @@ Authorization: Bearer <apiKey>
       async function createCred() {
         el("createErr").textContent = "";
         el("createdBanner").classList.remove("show");
+        lastApiKey = "";
         try {
           const created = await api("/admin/v1/credentials", {
             method: "POST",
@@ -312,13 +601,16 @@ Authorization: Bearer <apiKey>
               maxEgress: Number(el("maxEgress").value) || 10,
             },
           });
+          lastApiKey = created.apiKey;
           el("createdKey").textContent = created.apiKey;
           el("createdHint").textContent =
-            created.warning || "Store this key server-side only.";
+            created.warning ||
+            "Store server-side only. Disk keeps SHA-256 hash — full key is never re-shown.";
           el("createdBanner").classList.add("show");
           el("tenantId").value = "";
           await loadList();
           await loadMeta();
+          await loadAudit();
         } catch (err) {
           el("createErr").textContent = err.message || String(err);
         }
@@ -340,6 +632,43 @@ Authorization: Bearer <apiKey>
       };
       el("btnCreate").onclick = createCred;
       el("btnRefresh").onclick = loadList;
+      el("btnAudit").onclick = loadAudit;
+      el("btnUsage").onclick = loadUsage;
+      el("btnCopyGw").onclick = async () => {
+        if (metaCache) await copyText(metaCache.publicGatewayUrl);
+      };
+      el("btnCopyRt").onclick = async () => {
+        if (metaCache) await copyText(metaCache.realtimeUrl);
+      };
+      el("btnCopyKey").onclick = async () => {
+        if (lastApiKey) await copyText(lastApiKey);
+      };
+      el("btnCopyEnv").onclick = async () => {
+        if (!metaCache || !lastApiKey) return;
+        await copyText(
+          `SOFTQRAFT_GATEWAY_URL=${metaCache.publicGatewayUrl}\nSOFTQRAFT_API_KEY=${lastApiKey}\n`,
+        );
+      };
+      el("btnCopySnippet").onclick = async () => {
+        await copyText(el("snippet").textContent || "");
+      };
+
+      document.querySelectorAll("[data-preset]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-preset");
+          el("tenantId").value = id;
+          el("label").value = id;
+        });
+      });
+
+      document.querySelectorAll("[data-tab]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          snippetTab = btn.getAttribute("data-tab");
+          document.querySelectorAll("[data-tab]").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          renderSnippets();
+        });
+      });
 
       if (token()) {
         el("adminToken").value = token();

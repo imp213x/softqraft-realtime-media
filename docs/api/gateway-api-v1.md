@@ -170,9 +170,13 @@ POST /v1/sessions/sess_01H.../egress
 }
 ```
 
-Supported types (profile-gated): `room_composite_file`, `room_composite_hls`, `room_composite_rtmp`, `track`, `participant`.
+Supported types (schema): `room_composite_file`, `room_composite_hls`, `room_composite_rtmp`, `track`, `participant`.
 
-**Implemented now:** `room_composite_file`, `room_composite_hls`. Others return `501`.
+**Implemented now:** `room_composite_file`, `room_composite_hls`. Others return **`501`**.
+
+**Profiles are labels today:** `profile` is stored on the session but does **not** auto-start HLS, Echo, or hybrid audience paths. Callers must invoke egress (and later orchestration) explicitly. See [platform-maturity-assessment.md](../operations/platform-maturity-assessment.md) §10.
+
+**HLS playback status:** After start, `playback.status` may become `ready` when the Egress API accepts the job — **before** the playlist object exists. Treat early URLs as provisional until an active egress webhook / object probe (hardening backlog §7).
 
 HLS response includes `playback.hlsUrl` when `HLS_PUBLIC_BASE_URL` or `CDN_PUBLIC_BASE_URL` is configured.
 

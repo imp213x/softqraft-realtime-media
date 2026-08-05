@@ -8,9 +8,17 @@ import type { QuotaTracker } from "../../lib/quotas.js";
 import type { CredentialStore } from "../../lib/credential-store.js";
 import { sendError } from "../../lib/errors.js";
 import { ERROR_CODES } from "@softqraft/shared";
-import { SessionStore, assertSessionAccess } from "./store.js";
+import type { SessionStore } from "./store.js";
+import { assertSessionAccess } from "./store.js";
 import { toPublicSession } from "./types.js";
 import { mintParticipantToken } from "../../providers/livekit/tokens.js";
+import type { UsageMeter } from "../../lib/usage-meter.js";
+import {
+  buildRoomMetadata,
+  canAdoptRoom,
+  parseRoomMetadata,
+} from "../../lib/room-metadata.js";
+import { isTerminalEgressStatus } from "../../providers/livekit/egress.js";
 
 const createSessionBody = z.object({
   idempotencyKey: z.string().min(1).optional(),
@@ -66,15 +74,17 @@ export async function registerSessionRoutes(
   store: SessionStore,
   quotas: QuotaTracker,
   credentials: CredentialStore,
+  usage: UsageMeter,
 ): Promise<void> {
   app.post("/v1/sessions", async (req, reply) => {
+    let reservedTenant: string | null | undefined;
     try {
       const auth = requireServiceAuth(req, credentials);
       const body = createSessionBody.parse(req.body ?? {});
       const tenantId = auth.tenant?.tenantId ?? null;
 
       if (body.idempotencyKey) {
-        const existing = store.getByIdempotencyKey(
+        const existing = await store.getByIdempotencyKey(
           body.idempotencyKey,
           tenantId,
         );
@@ -83,28 +93,30 @@ export async function registerSessionRoutes(
         }
       }
 
-      quotas.assertCanCreateSession(auth.tenant);
+      // Atomic reserve before LiveKit work (fixes check-then-act race)
+      await quotas.tryReserveSession(auth.tenant);
+      if (auth.tenant) reservedTenant = auth.tenant.tenantId;
 
       const sessionId = `sess_${randomUUID().replace(/-/g, "")}`;
       const roomName = body.roomName?.trim() || sessionId;
       const emptyTimeout = body.realtime?.emptyTimeoutSeconds ?? 300;
       const maxParticipants = body.realtime?.maxParticipants ?? 50;
+      const roomMetadata = buildRoomMetadata({
+        sessionId,
+        tenantId,
+        externalId: body.externalId ?? null,
+        callerMetadata: body.metadata,
+      });
 
       try {
         await clients.rooms.createRoom({
           name: roomName,
           emptyTimeout,
           maxParticipants,
-          metadata: JSON.stringify({
-            sessionId,
-            tenantId,
-            externalId: body.externalId ?? null,
-            ...(body.metadata ?? {}),
-          }),
+          metadata: roomMetadata,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        // Room may already exist if caller reuses roomName — allow adopt
         if (!/already exists|conflict|duplicat/i.test(message)) {
           throw new HttpError(
             503,
@@ -112,9 +124,14 @@ export async function registerSessionRoutes(
             `LiveKit createRoom failed: ${message}`,
           );
         }
+        await assertRoomAdoptable(clients, {
+          roomName,
+          callerTenantId: tenantId,
+          tenantIsolationActive: credentials.hasTenantIsolation(),
+        });
       }
 
-      const session = store.create({
+      const session = await store.create({
         sessionId,
         tenantId,
         externalId: body.externalId ?? null,
@@ -128,15 +145,24 @@ export async function registerSessionRoutes(
           ...(body.metadata ?? {}),
           recording: body.recording ?? null,
         },
+        maxParticipants,
         idempotencyKey: body.idempotencyKey,
         createdAt: new Date().toISOString(),
         endedAt: null,
       });
 
-      quotas.onSessionCreated(tenantId);
+      usage.recordSessionCreated();
+      reservedTenant = undefined; // ownership transferred to session lifecycle
 
       return reply.status(201).send(toPublicSession(session));
     } catch (err) {
+      if (reservedTenant !== undefined) {
+        try {
+          await quotas.releaseSession(reservedTenant);
+        } catch {
+          /* best-effort */
+        }
+      }
       if (err instanceof z.ZodError) {
         return sendError(
           req,
@@ -154,13 +180,12 @@ export async function registerSessionRoutes(
       const q = req.query as { status?: string; limit?: string };
       const limit = Math.min(100, Math.max(1, Number(q.limit ?? 20) || 20));
       const tenantId = auth.tenant?.tenantId ?? null;
-      // When multi-tenant is active, scope list to caller's tenant
       const scopeTenant = credentials.hasTenantIsolation()
         ? tenantId
         : undefined;
-      const items = store
-        .list(q.status, limit, scopeTenant)
-        .map(toPublicSession);
+      const items = (await store.list(q.status, limit, scopeTenant)).map(
+        toPublicSession,
+      );
       return reply.send({ items });
     } catch (err) {
       return sendError(req, reply, err);
@@ -171,7 +196,7 @@ export async function registerSessionRoutes(
     try {
       const auth = requireServiceAuth(req, credentials);
       const { sessionId } = req.params as { sessionId: string };
-      const session = store.get(sessionId);
+      const session = await store.get(sessionId);
       const tenantId = auth.tenant?.tenantId ?? null;
       if (!assertSessionAccess(session, tenantId)) {
         throw new HttpError(404, ERROR_CODES.NOT_FOUND, "Session not found");
@@ -186,18 +211,17 @@ export async function registerSessionRoutes(
     try {
       const auth = requireServiceAuth(req, credentials);
       const { sessionId } = req.params as { sessionId: string };
-      const session = store.get(sessionId);
+      const session = await store.get(sessionId);
       const tenantId = auth.tenant?.tenantId ?? null;
       if (!assertSessionAccess(session, tenantId)) {
         throw new HttpError(404, ERROR_CODES.NOT_FOUND, "Session not found");
       }
 
-      // Best-effort stop active egress jobs
-      for (const job of store.listEgress(sessionId)) {
+      for (const job of await store.listEgress(sessionId)) {
         if (job.status === "starting" || job.status === "active") {
           try {
             await clients.egress.stopEgress(job.egressId);
-            store.putEgress({
+            await store.putEgress({
               ...job,
               status: "stopping",
               updatedAt: new Date().toISOString(),
@@ -205,6 +229,18 @@ export async function registerSessionRoutes(
           } catch (err) {
             req.log.warn({ err, egressId: job.egressId }, "stop egress failed");
           }
+        }
+        // Release egress quota for any still-held jobs when ending session
+        if (job.quotaHeld && !isTerminalEgressStatus(job.status)) {
+          await quotas.releaseEgress(job.tenantId);
+          await store.putEgress({
+            ...job,
+            status: isTerminalEgressStatus(job.status)
+              ? job.status
+              : "stopping",
+            quotaHeld: false,
+            updatedAt: new Date().toISOString(),
+          });
         }
       }
 
@@ -214,9 +250,15 @@ export async function registerSessionRoutes(
         req.log.warn({ err, room: session.roomName }, "deleteRoom failed");
       }
 
-      const ended = store.end(sessionId)!;
-      if (session.status !== "ended") {
-        quotas.onSessionEnded(session.tenantId);
+      const wasOpen = session.status !== "ended";
+      const ended = (await store.end(sessionId))!;
+      if (wasOpen) {
+        await quotas.releaseSession(session.tenantId);
+        usage.recordSessionEnded({
+          startedAt: session.createdAt,
+          endedAt: ended.endedAt ?? undefined,
+          assumedViewers: session.maxParticipants,
+        });
       }
       return reply.send(toPublicSession(ended));
     } catch (err) {
@@ -228,7 +270,7 @@ export async function registerSessionRoutes(
     try {
       const auth = requireServiceAuth(req, credentials);
       const { sessionId } = req.params as { sessionId: string };
-      const session = store.get(sessionId);
+      const session = await store.get(sessionId);
       const tenantId = auth.tenant?.tenantId ?? null;
       if (!assertSessionAccess(session, tenantId) || session.status === "ended") {
         throw new HttpError(404, ERROR_CODES.NOT_FOUND, "Session not found");
@@ -244,8 +286,10 @@ export async function registerSessionRoutes(
         attributes: body.attributes,
       });
 
+      usage.recordTokenMinted();
+
       if (session.status === "ready" && body.role === "host") {
-        store.update(sessionId, { status: "live" });
+        await store.update(sessionId, { status: "live" });
       }
 
       return reply.send(minted);
@@ -265,7 +309,7 @@ export async function registerSessionRoutes(
     try {
       const auth = requireServiceAuth(req, credentials);
       const { sessionId } = req.params as { sessionId: string };
-      const session = store.get(sessionId);
+      const session = await store.get(sessionId);
       const tenantId = auth.tenant?.tenantId ?? null;
       if (!assertSessionAccess(session, tenantId)) {
         throw new HttpError(404, ERROR_CODES.NOT_FOUND, "Session not found");
@@ -286,4 +330,53 @@ export async function registerSessionRoutes(
       return sendError(req, reply, err);
     }
   });
+}
+
+async function assertRoomAdoptable(
+  clients: LiveKitClients,
+  input: {
+    roomName: string;
+    callerTenantId: string | null;
+    tenantIsolationActive: boolean;
+  },
+): Promise<void> {
+  let rooms: Array<{ name?: string; metadata?: string }> = [];
+  try {
+    // listRooms accepts optional name filter in livekit-server-sdk
+    rooms = (await clients.rooms.listRooms([input.roomName])) as Array<{
+      name?: string;
+      metadata?: string;
+    }>;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new HttpError(
+      503,
+      ERROR_CODES.DEPENDENCY,
+      `LiveKit listRooms failed during adopt: ${message}`,
+    );
+  }
+
+  const room =
+    rooms.find((r) => r.name === input.roomName) ?? rooms[0] ?? null;
+  if (!room) {
+    throw new HttpError(
+      409,
+      ERROR_CODES.CONFLICT,
+      `Room '${input.roomName}' reported existing but could not be listed`,
+    );
+  }
+
+  const meta = parseRoomMetadata(room.metadata);
+  const decision = canAdoptRoom({
+    callerTenantId: input.callerTenantId,
+    roomMetadata: meta,
+    tenantIsolationActive: input.tenantIsolationActive,
+  });
+  if (!decision.ok) {
+    throw new HttpError(
+      409,
+      ERROR_CODES.CONFLICT,
+      `Cannot adopt room '${input.roomName}': ${decision.reason}`,
+    );
+  }
 }

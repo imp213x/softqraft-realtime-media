@@ -21,6 +21,8 @@ export interface SessionRecord {
     hlsUrl: string | null;
   };
   metadata: Record<string, unknown>;
+  /** Room cap; used for usage GB proxy only (not measured viewers). */
+  maxParticipants: number;
   idempotencyKey?: string;
   createdAt: string;
   endedAt: string | null;

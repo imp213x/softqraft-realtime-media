@@ -13,6 +13,7 @@
     "build": "pnpm -r run build",
     "dev:gateway": "pnpm --filter @softqraft/gateway-api dev",
     "build:gateway": "pnpm --filter @softqraft/shared build && pnpm --filter @softqraft/gateway-api build",
+    "build:sdk": "pnpm --filter @softqraft/shared build && pnpm --filter @softqraft/sdk build",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
