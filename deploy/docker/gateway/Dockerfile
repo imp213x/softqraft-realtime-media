@@ -8,12 +8,19 @@ WORKDIR /app
 FROM base AS build
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY tsconfig.base.json ./
+# All workspace package.json files before install (lockfile expects full workspace)
 COPY packages/shared/package.json packages/shared/tsconfig.json ./packages/shared/
+COPY packages/sdk/package.json packages/sdk/tsconfig.json ./packages/sdk/
 COPY services/gateway-api/package.json services/gateway-api/tsconfig.json ./services/gateway-api/
 
-RUN pnpm install --frozen-lockfile
+# Retry-friendly install (GCP VMs often see flaky registry connects)
+RUN pnpm config set fetch-retries 5 \
+ && pnpm config set fetch-retry-mintimeout 20000 \
+ && pnpm config set fetch-retry-maxtimeout 120000 \
+ && pnpm install --frozen-lockfile
 
 COPY packages/shared/src ./packages/shared/src
+COPY packages/sdk/src ./packages/sdk/src
 COPY services/gateway-api/src ./services/gateway-api/src
 COPY services/gateway-api/public ./services/gateway-api/public
 
