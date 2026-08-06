@@ -11,7 +11,9 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "files": [
@@ -25,7 +27,7 @@
     "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
-    "@softqraft/shared": "workspace:*"
+    "@softqraft/shared": "file:../shared"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
