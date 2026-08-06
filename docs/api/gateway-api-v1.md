@@ -4,7 +4,9 @@
 **Base path:** `/v1`  
 **Style:** JSON over HTTPS  
 **Auth:** `Authorization: Bearer <service_api_key>` (consumer backends only)  
-**Source of truth (machine):** [openapi/openapi-v1.yaml](openapi/openapi-v1.yaml)
+**Source of truth (machine):** [openapi/openapi-v1.yaml](openapi/openapi-v1.yaml)  
+**TypeScript client:** [`@softqraft/sdk`](../../packages/sdk/README.md) (`GATEWAY_API_VERSION = "v1"`)  
+**Boundaries:** [package-boundaries.md](../product/package-boundaries.md)
 
 This is the **plug surface** for any consumer app. Media clients use LiveKit SDKs with tokens issued here.
 

@@ -82,7 +82,7 @@ Echo later: same pattern (`room_composite_file`), not a new service name.
 
 | Gate | Done when |
 |------|-----------|
-| **M1 Packages** | SDK public methods match OpenAPI; versioned; README install path |
+| **M1 Packages** | ✅ SDK v0.2 + package-boundaries.md (2026-08-06) |
 | **M2 Contract** | CI: unit tests for auth/credentials/sessions critical paths + lint |
 | **M3 Consumer** | One external app creates session + tokens + live via **SDK or documented HTTP only** |
 | **M4 Optional HLS** | Only if M3 needs audience scale; HLS start + playback URL via Gateway/SDK |

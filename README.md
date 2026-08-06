@@ -11,7 +11,8 @@
 Replace managed LiveKit Cloud for realtime cost control. Keep client LiveKit SDKs.  
 **Clatters** and other apps integrate as consumers — they are not the product name.
 
-**License:** MIT · **Packages:** `@softqraft/*`
+**License:** MIT · **Packages:** `@softqraft/*`  
+**App integration:** use **`@softqraft/sdk` only** (or HTTP OpenAPI) — [package boundaries](docs/product/package-boundaries.md)
 
 ### Delivery status
 
@@ -37,6 +38,8 @@ See [docs/operations/cost-posture-and-planes.md](docs/operations/cost-posture-an
 | [docs/architecture/system-overview.md](docs/architecture/system-overview.md) | System design |
 | [docs/architecture/capability-profiles.md](docs/architecture/capability-profiles.md) | Situations covered |
 | [docs/api/gateway-api-v1.md](docs/api/gateway-api-v1.md) | HTTP contract |
+| [packages/sdk/README.md](packages/sdk/README.md) | **@softqraft/sdk** (integrator client) |
+| [docs/product/package-boundaries.md](docs/product/package-boundaries.md) | M1 package freeze |
 | [docs/integration/generic-integration-guide.md](docs/integration/generic-integration-guide.md) | Plug in any app |
 | [docs/integration/consumers/the-scholar-clatters-inventory.md](docs/integration/consumers/the-scholar-clatters-inventory.md) | Clatters inventory |
 | [docs/decisions/ADR-006-echo-recording-storage-aws.md](docs/decisions/ADR-006-echo-recording-storage-aws.md) | Echo stays on AWS S3 (for now) |

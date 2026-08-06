@@ -38,7 +38,8 @@ See [ADR-009](../decisions/ADR-009-cost-planes-and-hosting-posture.md), [cost-po
 | Hashed multi-key credentials + audit | ✅ |
 | Hetzner economic plane | ✅ live (media/realtime + admin) |
 | P0.5 Admin login/logout | ✅ |
-| **Next: modular core + SDK + tests** | 🔄 see [cto-next-phase-decision.md](cto-next-phase-decision.md) |
+| **M1 package boundaries + SDK v0.2** | ✅ [package-boundaries.md](package-boundaries.md) |
+| **M2 contract tests/lint** | ⏳ next |
 | First consumer dual-run | ⏳ after package freeze |
 | HLS + CDN capability | ⏳ after consumer path (not UI-first) |
 

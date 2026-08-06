@@ -6,10 +6,13 @@ How **any application** plugs into **SoftQraft Realtime Media** without adopting
 
 | Surface | Who uses it | Purpose |
 |---------|-------------|---------|
-| **Gateway HTTP API** | Your backend | Sessions, tokens, egress, playback, webhooks config |
+| **`@softqraft/sdk`** | Your backend (preferred) | Typed client over Gateway HTTP — see [package-boundaries.md](../product/package-boundaries.md) |
+| **Gateway HTTP API** | Your backend | Sessions, tokens, egress, playback |
 | **LiveKit WebRTC** | Your clients (SDKs) | Publish / subscribe realtime media |
 | **HLS/CDN URLs** | Your players (optional profile) | Mass audience / VOD |
 | **Webhooks** | Platform → your backend | Egress lifecycle, session events |
+
+**Do not** import `services/gateway-api` from your app. Use the SDK or OpenAPI only.
 
 ```text
 Your backend ──HTTPS──► Gateway ──► LiveKit + Egress
