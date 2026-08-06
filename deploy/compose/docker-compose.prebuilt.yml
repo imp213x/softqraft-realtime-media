@@ -1,0 +1,8 @@
+# Override: use prebuilt gateway image (no pnpm install in Docker).
+# Produced by: deploy/scripts/build-gateway-host.sh
+services:
+  gateway:
+    build:
+      context: ../docker/gateway
+      dockerfile: Dockerfile.prebuilt
+    image: softqraft-realtime-media-gateway:prebuilt
