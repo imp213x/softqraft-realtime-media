@@ -42,7 +42,8 @@ Self-hosted, app-agnostic live/realtime media (LiveKit + Egress + HTTP Gateway).
 | [operations/public-sfu-readiness.md](operations/public-sfu-readiness.md) | Public interactive SFU + hardening ladder |
 | [product/product-plan.md](product/product-plan.md) | Product roadmap (ship slice + next) |
 | [product/admin-console.md](product/admin-console.md) | Admin GUI + API credentials |
-| [product/admin-auth-design.md](product/admin-auth-design.md) | Future admin login/logout (public-ready) |
+| [product/admin-auth-design.md](product/admin-auth-design.md) | Admin login/logout design + P0.5 |
+| [product/cto-next-phase-decision.md](product/cto-next-phase-decision.md) | Next phase: modular core before HLS/scope |
 | [operations/turn-hls-cdn.md](operations/turn-hls-cdn.md) | Market-grade TURN / HLS / CDN / tenants |
 | [operations/load-test-plan-10k.md](operations/load-test-plan-10k.md) | Phase 3e load-test plan |
 | [architecture/market-grade-product.md](architecture/market-grade-product.md) | Product stack others would pay for |

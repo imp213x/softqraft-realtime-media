@@ -1,8 +1,9 @@
 # SoftQraft Realtime Media — product plan
 
-**Updated:** 2026-08-04  
+**Updated:** 2026-08-06  
 **Product:** Self-hosted realtime media platform (LiveKit SFU + HTTP Gateway)  
-**Identity:** SoftQraft Labs Ltd. · MIT · `@softqraft/*`
+**Identity:** SoftQraft Labs Ltd. · MIT · `@softqraft/*`  
+**Next phase decision:** [cto-next-phase-decision.md](cto-next-phase-decision.md)
 
 ## Goal
 
@@ -35,9 +36,11 @@ See [ADR-009](../decisions/ADR-009-cost-planes-and-hosting-posture.md), [cost-po
 | Cross-tenant room adopt fix | ✅ |
 | Durable Postgres + Redis quotas + webhooks | ✅ demo deploy |
 | Hashed multi-key credentials + audit | ✅ |
-| Hetzner CX33 economic plane | ⏳ provisioned; install next |
-| Admin delete-key UX | ⏳ next product polish |
-| Hardening #7 tests/lint | ⏳ next code track |
+| Hetzner economic plane | ✅ live (media/realtime + admin) |
+| P0.5 Admin login/logout | ✅ |
+| **Next: modular core + SDK + tests** | 🔄 see [cto-next-phase-decision.md](cto-next-phase-decision.md) |
+| First consumer dual-run | ⏳ after package freeze |
+| HLS + CDN capability | ⏳ after consumer path (not UI-first) |
 
 **Handoff:** [next-steps-handoff.md](../roadmap/next-steps-handoff.md)
 | Economic plane deploy runbook | 🔄 draft |
