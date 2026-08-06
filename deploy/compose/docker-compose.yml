@@ -165,11 +165,16 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  # Optional: run Gateway in Compose (also runs via pnpm dev:gateway on host)
+  # Gateway: do NOT run pnpm inside Docker (GCP often fails DNS to registry.npmjs.org).
+  # Build on the host first:
+  #   ./deploy/scripts/build-gateway-host.sh
+  # That fills deploy/docker/gateway/out and tags softqraft-realtime-media-gateway:prebuilt
   gateway:
+    image: softqraft-realtime-media-gateway:prebuilt
     build:
-      context: ../..
-      dockerfile: deploy/docker/gateway/Dockerfile
+      context: ../docker/gateway
+      dockerfile: Dockerfile.prebuilt
+      # packaging only — no network / no pnpm
     restart: unless-stopped
     depends_on:
       livekit:
