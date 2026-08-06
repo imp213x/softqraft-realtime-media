@@ -12,11 +12,13 @@
 - Public Gateway + realtime endpoints  
 - Deployment plane + usage (ADR-009)
 
-## Auth
+## Auth (current MVP)
 
 - Header: `Authorization: Bearer <GATEWAY_ADMIN_TOKEN>`  
 - UI stores token in `sessionStorage` only  
 - Env: `GATEWAY_ADMIN_TOKEN` (required; long random string)
+
+**Public product:** replace paste-token with email/password login + logout — [admin-auth-design.md](admin-auth-design.md).
 
 ## Storage (v2)
 

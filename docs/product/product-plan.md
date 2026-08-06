@@ -65,7 +65,8 @@ Integrating app
 
 | ID | Slice | Priority |
 |----|--------|----------|
-| **P0** | Admin GUI + credentials + plane/usage honesty | Now (R1) |
+| **P0** | Admin GUI + credentials + plane/usage honesty | ✅ MVP |
+| **P0.5** | Admin **login/logout** (email+password, sessions) | Before public multi-operator — [admin-auth-design.md](admin-auth-design.md) |
 | **P1** | Public SDK surface + integration docs | With P0 |
 | **P1b** | Economic plane ops (host + flags + dual DNS) | Parallel R2 |
 | **P1c** | Usage metering (persist later) | R3 before cutover |
