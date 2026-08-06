@@ -117,6 +117,30 @@ describe("CredentialStore", () => {
     assert.equal(disk.keys[0]?.keyHash, hashKey(plain));
   });
 
+  it("create on existing tenant mints another key instead of 409", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "sq-cred-"));
+    const store = new CredentialStore({
+      storePath: path.join(dir, "tenants.json"),
+      legacyKeys: new Set(),
+      envTenants: [],
+    });
+    const a = await store.create({
+      tenantId: "demo",
+      label: "Demo",
+      maxSessions: 50,
+      maxEgress: 10,
+    });
+    const b = await store.create({
+      tenantId: "demo",
+      label: "Demo",
+      maxSessions: 50,
+      maxEgress: 10,
+    });
+    assert.notEqual(a.apiKey, b.apiKey);
+    assert.ok(store.resolve(a.apiKey));
+    assert.ok(store.resolve(b.apiKey));
+  });
+
   it("records audit events", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "sq-cred-"));
     const store = new CredentialStore({

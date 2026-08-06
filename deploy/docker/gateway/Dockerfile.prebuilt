@@ -8,8 +8,13 @@
 FROM node:22-alpine
 ENV NODE_ENV=production
 WORKDIR /app
-RUN addgroup -S softqraft && adduser -S softqraft -G softqraft
+RUN addgroup -S softqraft && adduser -S softqraft -G softqraft \
+  && apk add --no-cache su-exec
 COPY --chown=softqraft:softqraft out/ ./
-USER softqraft
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+# entrypoint chowns /data then drops to softqraft
+USER root
 EXPOSE 8080
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "dist/index.js"]

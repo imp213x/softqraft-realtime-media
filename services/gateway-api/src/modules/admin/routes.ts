@@ -69,12 +69,11 @@ function mapCredError(err: unknown): never {
     if (/not found/i.test(err.message)) {
       throw new HttpError(404, ERROR_CODES.NOT_FOUND, err.message);
     }
-    if (/env-bootstrap|Cannot revoke|Cannot add|Cannot update|Cannot delete/i.test(
-      err.message,
-    )) {
-      throw new HttpError(400, ERROR_CODES.VALIDATION, err.message);
-    }
-    if (/Invalid expiresAt/i.test(err.message)) {
+    if (
+      /env-bootstrap|Cannot revoke|Cannot add|Cannot update|Cannot delete|Invalid expiresAt|Cannot write credential store|Failed to persist/i.test(
+        err.message,
+      )
+    ) {
       throw new HttpError(400, ERROR_CODES.VALIDATION, err.message);
     }
   }

@@ -216,10 +216,22 @@ export class CredentialStore {
       keys: [...this.keysById.values()].filter((k) => k.managed),
       audit: this.audit.slice(-MAX_AUDIT),
     };
-    await mkdir(path.dirname(this.storePath), { recursive: true });
-    const tmp = `${this.storePath}.${process.pid}.tmp`;
-    await writeFile(tmp, JSON.stringify(body, null, 2), "utf8");
-    await rename(tmp, this.storePath);
+    try {
+      await mkdir(path.dirname(this.storePath), { recursive: true });
+      const tmp = `${this.storePath}.${process.pid}.tmp`;
+      await writeFile(tmp, JSON.stringify(body, null, 2), "utf8");
+      await rename(tmp, this.storePath);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (code === "EACCES" || code === "EPERM") {
+        throw new Error(
+          `Cannot write credential store at ${this.storePath} (${code}). ` +
+            `Fix volume permissions (e.g. chown softqraft /data) and retry.`,
+        );
+      }
+      throw new Error(`Failed to persist credential store: ${msg}`);
+    }
   }
 
   private pushAudit(
@@ -394,23 +406,50 @@ export class CredentialStore {
         `Tenant '${tenantId}' is env-bootstrap; manage via GATEWAY_TENANTS`,
       );
     }
-    if (!policy) {
-      policy = {
-        tenantId,
-        label: (input.label || tenantId).trim().slice(0, 128),
-        maxSessions: Math.max(1, input.maxSessions ?? 50),
-        maxEgress: Math.max(1, input.maxEgress ?? 10),
-        createdAt: new Date().toISOString(),
-        managed: true,
+
+    // Tenant already exists → mint another key (Admin "Create" / retry path)
+    if (policy) {
+      if (input.maxSessions != null || input.maxEgress != null || input.label) {
+        policy = {
+          ...policy,
+          label: input.label?.trim()
+            ? input.label.trim().slice(0, 128)
+            : policy.label,
+          maxSessions:
+            input.maxSessions != null
+              ? Math.max(1, input.maxSessions)
+              : policy.maxSessions,
+          maxEgress:
+            input.maxEgress != null
+              ? Math.max(1, input.maxEgress)
+              : policy.maxEgress,
+        };
+        this.tenants.set(tenantId, policy);
+      }
+      const added = await this.createKey(tenantId, {
+        label: input.keyLabel || input.label || "default",
+        expiresAt: input.expiresAt,
+      });
+      return {
+        tenantId: policy.tenantId,
+        label: policy.label,
+        maxSessions: policy.maxSessions,
+        maxEgress: policy.maxEgress,
+        createdAt: policy.createdAt,
+        keyId: added.keyId,
+        apiKey: added.apiKey,
+        expiresAt: added.expiresAt,
       };
-      this.tenants.set(tenantId, policy);
-      this.pushAudit({ action: "tenant.created", tenantId });
-    } else if (input.label || input.maxSessions || input.maxEgress) {
-      // Allow create on existing tenant only for additional keys via createKey
-      throw new Error(
-        `Tenant '${tenantId}' already exists — use POST .../keys to add/rotate`,
-      );
     }
+
+    const newPolicy: TenantPolicy = {
+      tenantId,
+      label: (input.label || tenantId).trim().slice(0, 128),
+      maxSessions: Math.max(1, input.maxSessions ?? 50),
+      maxEgress: Math.max(1, input.maxEgress ?? 10),
+      createdAt: new Date().toISOString(),
+      managed: true,
+    };
 
     const minted = mintApiKey(tenantId);
     const rec: ApiKeyRecord = {
@@ -424,20 +463,33 @@ export class CredentialStore {
       revokedAt: null,
       managed: true,
     };
+
+    // Apply in-memory, persist, rollback if disk fails (avoids 500 then 409)
+    this.tenants.set(tenantId, newPolicy);
     this.indexKey(rec);
+    this.pushAudit({ action: "tenant.created", tenantId });
     this.pushAudit({
       action: "key.created",
       tenantId,
       keyId: rec.keyId,
     });
-    await this.persist();
+    try {
+      await this.persist();
+    } catch (err) {
+      this.tenants.delete(tenantId);
+      this.unindexKey(rec);
+      this.audit = this.audit.filter(
+        (a) => a.keyId !== rec.keyId && a.tenantId !== tenantId,
+      );
+      throw err;
+    }
 
     return {
-      tenantId: policy.tenantId,
-      label: policy.label,
-      maxSessions: policy.maxSessions,
-      maxEgress: policy.maxEgress,
-      createdAt: policy.createdAt,
+      tenantId: newPolicy.tenantId,
+      label: newPolicy.label,
+      maxSessions: newPolicy.maxSessions,
+      maxEgress: newPolicy.maxEgress,
+      createdAt: newPolicy.createdAt,
       keyId: rec.keyId,
       apiKey: minted.apiKey,
       expiresAt: rec.expiresAt,
