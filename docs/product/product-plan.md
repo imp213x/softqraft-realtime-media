@@ -27,12 +27,19 @@ See [ADR-009](../decisions/ADR-009-cost-planes-and-hosting-posture.md), [cost-po
 | coturn TURN | ✅ H3 |
 | Secrets + firewall + static IP + monitoring | ✅ H4–H6 |
 | Cost posture docs + dual-plane decision | ✅ ADR-009 |
-| Admin GUI + credentials + usage + plane honesty | ✅ beta |
+| Admin GUI + credentials + usage + plane honesty | ✅ live on GCP demo |
 | Usage metering (in-process) | ✅ beta (not durable) |
 | Public Node SDK `@softqraft/sdk` | ✅ scaffold |
 | Hardening inventory (10 findings) | ✅ documented |
 | LiveKit image pin + compose CI | ✅ |
 | Cross-tenant room adopt fix | ✅ |
+| Durable Postgres + Redis quotas + webhooks | ✅ demo deploy |
+| Hashed multi-key credentials + audit | ✅ |
+| Hetzner CX33 economic plane | ⏳ provisioned; install next |
+| Admin delete-key UX | ⏳ next product polish |
+| Hardening #7 tests/lint | ⏳ next code track |
+
+**Handoff:** [next-steps-handoff.md](../roadmap/next-steps-handoff.md)
 | Economic plane deploy runbook | 🔄 draft |
 | Echo / MP4 recording | ⏸ deferred |
 | HLS + CDN (scale cost product) | ⏸ R4 when scale |

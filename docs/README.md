@@ -33,6 +33,7 @@ Self-hosted, app-agnostic live/realtime media (LiveKit + Egress + HTTP Gateway).
 | [operations/env-inventory.md](operations/env-inventory.md) | **All process env** · VPC redaction · code vs compose gaps |
 | [operations/vpc-env-audit.md](operations/vpc-env-audit.md) | Live GCP demo `.env` audit + fix steps |
 | [roadmap/hardening-engineering-order.md](roadmap/hardening-engineering-order.md) | P0–P2 hardening backlog |
+| [roadmap/next-steps-handoff.md](roadmap/next-steps-handoff.md) | **2026-08-06 handoff** · GCP live · Hetzner · #7 · delete keys |
 | [operations/economic-plane-runbook.md](operations/economic-plane-runbook.md) | Deploy economic production plane |
 | [decisions/ADR-009-cost-planes-and-hosting-posture.md](decisions/ADR-009-cost-planes-and-hosting-posture.md) | ADR: dual-plane cost posture |
 | [roadmap/cost-product-implementation-plan.md](roadmap/cost-product-implementation-plan.md) | Recs 1–4 implementation plan |

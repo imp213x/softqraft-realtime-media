@@ -3,10 +3,11 @@
 **Source:** [platform-maturity-assessment.md](../operations/platform-maturity-assessment.md)  
 **Updated:** 2026-08-05  
 
-### Stop point (2026-08-05)
+### Stop / handoff (2026-08-06)
 
-**Paused before #7.** Completed 1–6. Next session: **#7 tests/lint**, then 8–10.  
-**Parallel now:** VPC env alignment — [env-inventory.md](../operations/env-inventory.md).
+**GCP demo plane live** (Admin, Postgres, Redis, prebuilt gateway, R2, TURN).  
+**Paused code track before #7** (tests/lint).  
+**Parallel infra:** Hetzner CX33 economic plane — see [next-steps-handoff.md](next-steps-handoff.md).
 
 | # | Work | Status |
 |--:|------|--------|
