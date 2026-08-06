@@ -166,15 +166,29 @@
   <body>
     <header>
       <h1>SoftQraft Admin · API credentials</h1>
-      <span class="muted" id="statusLine">Sign in with admin token</span>
+      <span class="muted" id="statusLine">Sign in</span>
     </header>
     <main>
       <section class="card" id="loginCard">
-        <h2>Admin access</h2>
-        <p class="muted">Uses <code>GATEWAY_ADMIN_TOKEN</code>. Not LiveKit or tenant API keys.</p>
-        <label>Admin token</label>
-        <input id="adminToken" type="password" autocomplete="current-password" placeholder="Bearer secret" />
-        <button id="btnLogin" type="button">Unlock console</button>
+        <h2 id="loginTitle">Admin sign in</h2>
+        <p class="muted" id="loginHelp">Email + password (or break-glass token).</p>
+        <div id="bootstrapFields" style="display:none">
+          <label>Bootstrap token (<code>GATEWAY_ADMIN_TOKEN</code>)</label>
+          <input id="bootstrapToken" type="password" autocomplete="off" />
+        </div>
+        <label>Email</label>
+        <input id="loginEmail" type="email" autocomplete="username" placeholder="you@company.com" />
+        <label style="margin-top:0.5rem">Password</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" />
+        <button id="btnLogin" type="button">Sign in</button>
+        <button id="btnBootstrap" type="button" class="secondary" style="display:none">Create owner account</button>
+        <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0" />
+        <details>
+          <summary class="muted" style="cursor:pointer">Break-glass token (env only)</summary>
+          <label style="margin-top:0.5rem">GATEWAY_ADMIN_TOKEN</label>
+          <input id="adminToken" type="password" autocomplete="off" placeholder="Optional break-glass" />
+          <button id="btnTokenLogin" type="button" class="secondary">Unlock with token</button>
+        </details>
         <p class="err" id="loginErr"></p>
       </section>
 
@@ -194,7 +208,7 @@
         <div class="actions">
           <button type="button" class="secondary inline" id="btnCopyGw">Copy gateway URL</button>
           <button type="button" class="secondary inline" id="btnCopyRt">Copy realtime URL</button>
-          <button type="button" class="secondary" id="btnLogout">Lock console</button>
+          <button type="button" class="secondary" id="btnLogout">Log out</button>
         </div>
       </section>
 
@@ -303,12 +317,10 @@
       let metaCache = null;
       let lastApiKey = "";
       let snippetTab = "curl";
+      let breakGlassToken = "";
 
-      function token() {
-        return sessionStorage.getItem("sq_admin_token") || "";
-      }
-
-      function setToken(t) {
+      function setBreakGlass(t) {
+        breakGlassToken = t || "";
         if (t) sessionStorage.setItem("sq_admin_token", t);
         else sessionStorage.removeItem("sq_admin_token");
       }
@@ -322,13 +334,15 @@
         }
       }
 
-      async function api(path, { method = "GET", body } = {}) {
+      async function api(path, { method = "GET", body, auth = true } = {}) {
+        const headers = { "Content-Type": "application/json" };
+        if (auth && breakGlassToken) {
+          headers.Authorization = `Bearer ${breakGlassToken}`;
+        }
         const res = await fetch(`${base()}${path}`, {
           method,
-          headers: {
-            Authorization: `Bearer ${token()}`,
-            "Content-Type": "application/json",
-          },
+          credentials: "include",
+          headers,
           body: body ? JSON.stringify(body) : undefined,
         });
         const data = await res.json().catch(() => ({}));
@@ -343,6 +357,28 @@
         ["planeCard", "appCard", "usageCard", "createCard", "listCard", "auditCard", "docsCard"].forEach((id) => {
           el(id).style.display = on ? "block" : "none";
         });
+      }
+
+      async function loadAuthStatus() {
+        try {
+          const s = await api("/admin/v1/auth/status", { auth: false });
+          if (s.needsBootstrap) {
+            el("loginTitle").textContent = "Create owner account";
+            el("loginHelp").textContent =
+              "First-time setup: bootstrap token from env + your email/password.";
+            el("bootstrapFields").style.display = "block";
+            el("btnBootstrap").style.display = "block";
+            el("btnLogin").style.display = "none";
+          } else {
+            el("loginTitle").textContent = "Admin sign in";
+            el("loginHelp").textContent = "Email + password for this operator.";
+            el("bootstrapFields").style.display = "none";
+            el("btnBootstrap").style.display = "none";
+            el("btnLogin").style.display = "block";
+          }
+        } catch {
+          /* keep default form */
+        }
       }
 
       function planeChip(plane) {
@@ -566,22 +602,71 @@ Authorization: Bearer <apiKey>
         }
       }
 
-      async function unlock() {
+      async function enterApp() {
+        await loadMeta();
+        showApp(true);
+        await loadList();
+        await loadUsage();
+        await loadAudit();
+      }
+
+      async function loginPassword() {
+        el("loginErr").textContent = "";
+        setBreakGlass("");
+        try {
+          const me = await api("/admin/v1/auth/login", {
+            method: "POST",
+            auth: false,
+            body: {
+              email: el("loginEmail").value.trim(),
+              password: el("loginPassword").value,
+            },
+          });
+          el("statusLine").textContent =
+            "Signed in · " + (me.operator?.email || "admin");
+          el("loginPassword").value = "";
+          await enterApp();
+        } catch (err) {
+          el("loginErr").textContent = err.message || String(err);
+        }
+      }
+
+      async function bootstrapOwner() {
+        el("loginErr").textContent = "";
+        setBreakGlass("");
+        try {
+          const me = await api("/admin/v1/auth/bootstrap", {
+            method: "POST",
+            auth: false,
+            body: {
+              bootstrapToken: el("bootstrapToken").value.trim(),
+              email: el("loginEmail").value.trim(),
+              password: el("loginPassword").value,
+            },
+          });
+          el("statusLine").textContent =
+            "Owner · " + (me.operator?.email || "admin");
+          el("loginPassword").value = "";
+          el("bootstrapToken").value = "";
+          await enterApp();
+        } catch (err) {
+          el("loginErr").textContent = err.message || String(err);
+        }
+      }
+
+      async function unlockToken() {
         el("loginErr").textContent = "";
         const t = el("adminToken").value.trim();
         if (!t) {
-          el("loginErr").textContent = "Enter admin token";
+          el("loginErr").textContent = "Enter break-glass admin token";
           return;
         }
-        setToken(t);
+        setBreakGlass(t);
         try {
-          await loadMeta();
-          showApp(true);
-          await loadList();
-          await loadUsage();
-          await loadAudit();
+          await enterApp();
+          el("statusLine").textContent = "Break-glass token";
         } catch (err) {
-          setToken("");
+          setBreakGlass("");
           showApp(false);
           el("loginErr").textContent = err.message || String(err);
         }
@@ -624,11 +709,19 @@ Authorization: Bearer <apiKey>
           .replace(/"/g, "&quot;");
       }
 
-      el("btnLogin").onclick = unlock;
-      el("btnLogout").onclick = () => {
-        setToken("");
+      el("btnLogin").onclick = loginPassword;
+      el("btnBootstrap").onclick = bootstrapOwner;
+      el("btnTokenLogin").onclick = unlockToken;
+      el("btnLogout").onclick = async () => {
+        try {
+          await api("/admin/v1/auth/logout", { method: "POST", auth: false });
+        } catch {
+          /* ignore */
+        }
+        setBreakGlass("");
         showApp(false);
-        el("statusLine").textContent = "Sign in with admin token";
+        el("statusLine").textContent = "Sign in";
+        await loadAuthStatus();
       };
       el("btnCreate").onclick = createCred;
       el("btnRefresh").onclick = loadList;
@@ -670,10 +763,20 @@ Authorization: Bearer <apiKey>
         });
       });
 
-      if (token()) {
-        el("adminToken").value = token();
-        unlock();
-      }
+      (async () => {
+        await loadAuthStatus();
+        // Resume cookie session if any
+        try {
+          await api("/admin/v1/auth/me", { auth: false });
+          await enterApp();
+        } catch {
+          const t = sessionStorage.getItem("sq_admin_token");
+          if (t) {
+            el("adminToken").value = t;
+            await unlockToken();
+          }
+        }
+      })();
     </script>
   </body>
 </html>

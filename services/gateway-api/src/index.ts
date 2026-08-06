@@ -22,10 +22,15 @@ import { registerSessionRoutes } from "./modules/sessions/routes.js";
 import { registerEgressRoutes } from "./modules/egress/routes.js";
 import { registerWebhookRoutes } from "./modules/webhooks/routes.js";
 import { registerAdminRoutes } from "./modules/admin/routes.js";
+import { createAdminAuthStore } from "./lib/admin-auth.js";
 
 async function main() {
   const config = loadConfig();
   const clients = createLiveKitClients(config);
+  const adminAuth = await createAdminAuthStore({
+    databaseUrl: config.databaseUrl,
+    filePath: config.adminAuthStorePath,
+  });
 
   let store: SessionStore;
   let storeBackend: "memory" | "postgres" = "memory";
@@ -86,7 +91,7 @@ async function main() {
     quotaBackend,
     redis,
   });
-  await registerAdminRoutes(app, config, credentials, usage);
+  await registerAdminRoutes(app, config, credentials, usage, adminAuth);
   await registerSessionRoutes(
     app,
     config,
@@ -118,7 +123,10 @@ async function main() {
       storeBackend,
       quotaBackend,
       databaseUrl: config.databaseUrl ? "[set]" : null,
-      adminEnabled: Boolean(config.adminToken),
+      adminEnabled:
+        Boolean(config.adminToken) ||
+        (await adminAuth.countOperators()) > 0,
+      adminOperators: await adminAuth.countOperators(),
       tenantStorePath: config.tenantStorePath,
       tenantCount: credentials.tenantCount(),
       iceServers: config.iceServers.map((s) => ({

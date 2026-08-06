@@ -48,3 +48,25 @@ CREATE TABLE IF NOT EXISTS egress_jobs (
 
 CREATE INDEX IF NOT EXISTS egress_jobs_session_idx
   ON egress_jobs (session_id);
+
+-- P0.5 Admin operators + sessions
+CREATE TABLE IF NOT EXISTS admin_operators (
+  id              TEXT PRIMARY KEY,
+  email           TEXT NOT NULL UNIQUE,
+  password_hash   TEXT NOT NULL,
+  password_salt   TEXT NOT NULL,
+  role            TEXT NOT NULL,
+  disabled_at     TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  id              TEXT PRIMARY KEY,
+  operator_id     TEXT NOT NULL REFERENCES admin_operators(id) ON DELETE CASCADE,
+  token_hash      TEXT NOT NULL UNIQUE,
+  expires_at      TIMESTAMPTZ NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS admin_sessions_expires_idx
+  ON admin_sessions (expires_at);

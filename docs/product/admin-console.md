@@ -12,14 +12,16 @@
 - Public Gateway + realtime endpoints  
 - Deployment plane + usage (ADR-009)
 
-## Auth (current MVP)
+## Auth (P0.5)
 
-- Header: `Authorization: Bearer <GATEWAY_ADMIN_TOKEN>`  
-- UI stores token in `sessionStorage` only  
-- Env: `GATEWAY_ADMIN_TOKEN` (required; long random string)
+| Mode | How |
+|------|-----|
+| **Password (preferred)** | Email + password → HttpOnly cookie `sq_admin_session` |
+| **Bootstrap (first owner)** | No operators yet → bootstrap token + email + password |
+| **Break-glass** | `Authorization: Bearer GATEWAY_ADMIN_TOKEN` (env; optional in UI) |
 
-**Public product:** replace paste-token with email/password login + logout — [admin-auth-design.md](admin-auth-design.md).
-
+- `POST /admin/v1/auth/login` · `logout` · `me` · `bootstrap` · `GET /auth/status`  
+- Design: [admin-auth-design.md](admin-auth-design.md)
 ## Storage (v2)
 
 | Concern | Behavior |

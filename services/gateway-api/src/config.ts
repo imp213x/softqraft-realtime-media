@@ -52,10 +52,19 @@ export interface GatewayConfig {
    * LiveKit webhooks are verified then forwarded with the original signature.
    */
   webhookForwardUrls: string[];
-  /** Bearer token for /admin/* (credential management). Empty = admin disabled. */
+  /** Bearer break-glass admin token (phase B dual-mode with cookie sessions). */
   adminToken: string;
+  /**
+   * One-time bootstrap for first owner (or same as adminToken).
+   * Used only when no operators exist.
+   */
+  adminBootstrapToken: string;
   /** JSON file for admin-generated API keys */
   tenantStorePath: string;
+  /** File fallback for admin operators when DATABASE_URL empty */
+  adminAuthStorePath: string;
+  /** Secure cookies when true (default: PUBLIC_GATEWAY_URL is https) */
+  adminCookieSecure: boolean;
   /** Public HTTPS base for Admin UI meta (e.g. https://media.softqraftlabs.com) */
   publicGatewayUrl: string;
   /**
@@ -231,11 +240,21 @@ export function loadConfig(): GatewayConfig {
       .map((u) => u.trim())
       .filter(Boolean),
     adminToken: env("GATEWAY_ADMIN_TOKEN"),
+    adminBootstrapToken:
+      env("GATEWAY_ADMIN_BOOTSTRAP_TOKEN") || env("GATEWAY_ADMIN_TOKEN"),
     tenantStorePath: env(
       "TENANT_STORE_PATH",
       pathDefaultTenantStore(),
     ),
+    adminAuthStorePath: env(
+      "ADMIN_AUTH_STORE_PATH",
+      `${process.cwd()}/data/admin-auth.json`,
+    ),
     publicGatewayUrl: env("PUBLIC_GATEWAY_URL").replace(/\/$/, ""),
+    adminCookieSecure: envBool(
+      "ADMIN_COOKIE_SECURE",
+      env("PUBLIC_GATEWAY_URL").toLowerCase().startsWith("https://"),
+    ),
     deploymentPlane: parseDeploymentPlane(env("DEPLOYMENT_PLANE", "demo")),
     hostingCostClass: parseHostingCostClass(
       env("HOSTING_COST_CLASS", "unknown"),

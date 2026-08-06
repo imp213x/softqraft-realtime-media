@@ -1,7 +1,7 @@
 # Admin authentication design (public product)
 
-**Status:** Planned (post Hetzner cutover)  
-**Today:** Bearer `GATEWAY_ADMIN_TOKEN` pasted into Admin UI (`sessionStorage`)  
+**Status:** Implemented (phase B dual-mode) — 2026-08-06  
+**Auth:** Email + password sessions (HttpOnly cookie) **or** break-glass `GATEWAY_ADMIN_TOKEN`  
 **Goal:** Proper sign-in / sign-out suitable for public SoftQraft operators  
 
 ## Problem
