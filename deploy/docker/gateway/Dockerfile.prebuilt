@@ -1,19 +1,19 @@
-# Gateway image from host-built artifacts (no npm inside Docker).
-# Use when Docker build cannot resolve registry.npmjs.org (EAI_AGAIN).
+# Gateway image from host-built artifacts (no npm / no apk network in Docker).
 #
 #   ./deploy/scripts/build-gateway-host.sh
-#   docker compose -f deploy/compose/docker-compose.yml \
-#     -f deploy/compose/docker-compose.prebuilt.yml --profile turn up -d
+#   cd deploy/compose && docker compose up -d --force-recreate gateway
 
 FROM node:22-alpine
 ENV NODE_ENV=production
 WORKDIR /app
-RUN addgroup -S softqraft && adduser -S softqraft -G softqraft \
-  && apk add --no-cache su-exec
+
+# User only — no `apk add` (fails when Docker DNS cannot reach Alpine mirrors)
+RUN addgroup -S softqraft && adduser -S softqraft -G softqraft
+
 COPY --chown=softqraft:softqraft out/ ./
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
-# entrypoint chowns /data then drops to softqraft
+
 USER root
 EXPOSE 8080
 ENTRYPOINT ["/docker-entrypoint.sh"]
