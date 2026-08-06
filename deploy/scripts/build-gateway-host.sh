@@ -14,21 +14,33 @@ if ! command -v node >/dev/null 2>&1; then
   echo "  sudo apt-get install -y nodejs"
   exit 1
 fi
-corepack enable
-corepack prepare pnpm@9.15.0 --activate
+
+# Prefer system pnpm; else enable corepack (may need sudo for /usr/bin links)
+if command -v pnpm >/dev/null 2>&1; then
+  PNPM=(pnpm)
+elif corepack enable 2>/dev/null && corepack prepare pnpm@9.15.0 --activate 2>/dev/null; then
+  PNPM=(pnpm)
+elif sudo corepack enable && sudo corepack prepare pnpm@9.15.0 --activate; then
+  PNPM=(pnpm)
+else
+  echo "Falling back to: npx pnpm@9.15.0"
+  PNPM=(npx --yes pnpm@9.15.0)
+fi
+
+echo "==> using: ${PNPM[*]} ($(${PNPM[@]} -v))"
 
 echo "==> pnpm install (host network / DNS)"
-pnpm config set fetch-retries 5
-pnpm config set fetch-retry-mintimeout 20000
-pnpm install --frozen-lockfile
+"${PNPM[@]}" config set fetch-retries 5 || true
+"${PNPM[@]}" config set fetch-retry-mintimeout 20000 || true
+"${PNPM[@]}" install --frozen-lockfile
 
 echo "==> build shared + gateway"
-pnpm --filter @softqraft/shared build
-pnpm --filter @softqraft/gateway-api build
+"${PNPM[@]}" --filter @softqraft/shared build
+"${PNPM[@]}" --filter @softqraft/gateway-api build
 
 echo "==> deploy production bundle -> $OUT_DIR"
 rm -rf "$OUT_DIR"
-pnpm --filter @softqraft/gateway-api deploy --prod "$OUT_DIR"
+"${PNPM[@]}" --filter @softqraft/gateway-api deploy --prod "$OUT_DIR"
 mkdir -p "$OUT_DIR/public"
 cp -R "$ROOT/services/gateway-api/public/." "$OUT_DIR/public/"
 
