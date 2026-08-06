@@ -17,7 +17,7 @@
 | 4 | Quotas → Redis atomic; LiveKit event reconcile | ✅ Lua reserve; webhook room_finished + egress release |
 | 5 | Durable async idempotent webhooks | 🔄 sync handler + quota/session reconcile; outbox queue ⏳ |
 | 6 | Credentials: hash, rotation, audit, volume | ✅ v2 store + multi-key + audit + Compose volume |
-| **7** | **Real unit/integration tests + lint** | ⏸ **STOP — next** |
+| **7** | **Real unit/integration tests + lint** | ✅ unit suite + `.github/workflows/ci.yml` (M2) |
 | 8 | Full `/ready` probes + metrics | ⏳ |
 | 9 | TURN/TLS + temporary credentials | ⏳ |
 | 10 | L1–L3 CDN/soak/failure before 10k claims | ⏳ |

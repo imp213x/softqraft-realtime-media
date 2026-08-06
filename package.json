@@ -15,8 +15,9 @@
     "build:gateway": "pnpm --filter @softqraft/shared build && pnpm --filter @softqraft/gateway-api build",
     "build:sdk": "pnpm --filter @softqraft/shared build && pnpm --filter @softqraft/sdk build",
     "lint": "pnpm -r run lint",
-    "typecheck": "pnpm -r run typecheck",
-    "test": "pnpm -r run test",
+    "typecheck": "pnpm --filter @softqraft/shared typecheck && pnpm --filter @softqraft/sdk typecheck && pnpm --filter @softqraft/gateway-api typecheck",
+    "test": "pnpm --filter @softqraft/shared test && pnpm --filter @softqraft/sdk test && pnpm --filter @softqraft/gateway-api test",
+    "test:ci": "pnpm run typecheck && pnpm run test",
     "smoke:phase1": "powershell -ExecutionPolicy Bypass -File ./scripts/smoke-phase1.ps1",
     "smoke:phase3": "powershell -ExecutionPolicy Bypass -File ./scripts/smoke-phase3.ps1",
     "local:live": "powershell -ExecutionPolicy Bypass -File ./scripts/start-local-live.ps1"

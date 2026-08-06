@@ -106,6 +106,12 @@ Do not put consumer business logic in `gateway-api`.
 - [x] README install + golden path  
 - [x] No requirement for consumers to clone gateway source  
 
-## Next (M2)
+## M2 (contract CI)
 
-Contract tests/lint CI on `shared` + `sdk` + critical gateway modules.
+| Check | Command / workflow |
+|-------|---------------------|
+| Typecheck | `pnpm run typecheck` |
+| Unit tests | `pnpm run test` |
+| CI | `.github/workflows/ci.yml` on push/PR to main |
+
+Covers: `@softqraft/shared`, `@softqraft/sdk` (incl. path contract), gateway credential/quota/room-metadata/admin-auth unit tests.
