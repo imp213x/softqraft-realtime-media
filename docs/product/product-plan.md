@@ -1,9 +1,10 @@
 # SoftQraft Realtime Media — product plan
 
-**Updated:** 2026-08-06  
+**Updated:** 2026-08-07  
 **Product:** Self-hosted realtime media platform (LiveKit SFU + HTTP Gateway)  
 **Identity:** SoftQraft Labs Ltd. · MIT · `@softqraft/*`  
-**Next phase decision:** [cto-next-phase-decision.md](cto-next-phase-decision.md)
+**Next phase decision:** [cto-next-phase-decision.md](cto-next-phase-decision.md)  
+**Egress/HLS economics:** [ADR-010](../decisions/ADR-010-economical-egress-hls.md)
 
 ## Goal
 
@@ -40,14 +41,14 @@ See [ADR-009](../decisions/ADR-009-cost-planes-and-hosting-posture.md), [cost-po
 | P0.5 Admin login/logout | ✅ |
 | **M1 package boundaries + SDK v0.2** | ✅ [package-boundaries.md](package-boundaries.md) |
 | **M2 contract tests/lint** | ✅ CI + unit tests |
-| First consumer dual-run | ⏳ after package freeze |
-| HLS + CDN capability | ⏳ after consumer path (not UI-first) |
+| **M3 first consumer (Jari HTTP + WebRTC)** | ✅ sell publish + viewer on economic plane |
+| **S1–S2 public Admin shell** | 🔄 login + nav + utilities |
+| HLS + CDN capability | ⏳ optional per [ADR-010](../decisions/ADR-010-economical-egress-hls.md) — off by default |
+| Economic plane deploy runbook | ✅ live Hetzner |
+| Echo / MP4 recording | ⏸ deferred until consumer needs VOD |
+| Session durability | ✅ Postgres store on economic plane |
 
 **Handoff:** [next-steps-handoff.md](../roadmap/next-steps-handoff.md)
-| Economic plane deploy runbook | 🔄 draft |
-| Echo / MP4 recording | ⏸ deferred |
-| HLS + CDN (scale cost product) | ⏸ R4 when scale |
-| Session durability (DB) | ⏸ H7 later |
 
 ## Architecture (product)
 
@@ -74,9 +75,10 @@ Integrating app
 | **P1** | Public SDK surface + integration docs | With P0 |
 | **P1b** | Economic plane ops (host + flags + dual DNS) | Parallel R2 |
 | **P1c** | Usage metering (persist later) | R3 before cutover |
-| **P2** | First consumer dual-run (optional; after economic plane) | Later |
-| **P3** | H7 session store persistence | Multi-gateway |
-| **P4** | H8 HLS + CDN as **cost product** | Scale (R4) |
+| **P2** | First consumer dual-run | ✅ Jari SoftQraft provider |
+| **P2b** | Public Admin login + navigation + utilities | **Now** (S1–S2) |
+| **P3** | Session store persistence | ✅ Postgres (economic) |
+| **P4** | H8 HLS + CDN as **optional cost product** | ADR-010 when scale needed |
 | **P5** | H9 Echo / VOD | When product requires replay |
 
 Plan detail: [cost-product-implementation-plan.md](../roadmap/cost-product-implementation-plan.md).

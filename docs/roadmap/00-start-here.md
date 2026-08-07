@@ -65,9 +65,13 @@ Checklist: [../operations/phase-2-checklist.md](../operations/phase-2-checklist.
 
 ## Next work (in order)
 
-1. **Local Clatters dual-run on MinIO** (two users)  
-2. Optional non-prod staging  
-3. Optional: HLS profile (Phase 3) once dual-run is stable  
+1. **Public Admin shell (S1–S2)** — login + nav + utilities on economic plane  
+2. **Integrator polish** — OpenAPI/SDK as sole public contracts  
+3. **HLS/egress (M4)** — only when a consumer needs scale; follow [ADR-010](../decisions/ADR-010-economical-egress-hls.md)  
+4. Echo/VOD when product requires replay  
+
+Consumer dual-run (Jari SoftQraft WebRTC) is **proven** on economic plane; Clatters remains optional later.  
+
 
 ---
 

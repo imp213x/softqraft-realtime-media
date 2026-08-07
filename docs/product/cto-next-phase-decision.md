@@ -1,104 +1,101 @@
-# CTO decision: next phase after economic plane MVP
+# CTO decision: SoftQraft public product phase
 
-**Date:** 2026-08-06  
-**Context:** Hetzner economic plane live (~£12/mo); interactive SFU + Admin + P0.5 auth; GCP gone.  
-**Constraint (hard):** packaging / modularization first — avoid future decoupling.
+**Updated:** 2026-08-07  
+**Product:** SoftQraft Realtime Media (self-hosted SFU + Gateway)  
+**Plane in use:** economic production (Hetzner) — `media` / `realtime.softqraftlabs.com`  
+**Repo boundary:** SoftQraft platform only. Consumer app UX (Jari sell/viewer, Clatters) lives in those repos.
 
-## Options considered
+---
 
-| # | Option | Verdict |
-|---|--------|---------|
-| 1 | Continue tightening Admin UI/UX | **Support only** — polish that serves integration, not a quarter of design |
-| 2 | Broaden scope (new product lines, multi-app features) | **Reject for now** — expands surface before contracts freeze |
-| 3 | Full Egress + HLS for “complete” consumption | **Next major capability**, but **after** modular boundaries and one real consumer |
+## Where we are (gates)
 
-## Decision
+| Gate | Status | Evidence |
+|------|--------|----------|
+| **M1 Packages** | ✅ | `@softqraft/shared` + `@softqraft/sdk` v0.2 + [package-boundaries.md](package-boundaries.md) |
+| **M2 Contract** | ✅ | CI typecheck + unit tests |
+| **M3 First consumer** | ✅ | Jari uses Gateway HTTP (`softqraft.client`) + livekit-client; sell publish + viewer proven on economic plane |
+| **M4 HLS / scale egress** | ⏳ | **Decision locked** — see [ADR-010](../decisions/ADR-010-economical-egress-hls.md); implement when a consumer needs passive scale |
 
-**Phase name: Productize the modular core (then scale path)**
+**Not SoftQraft work (deferred elsewhere):** Jari mobile OTA; Jari ICE client wiring polish; IVS/Twitch-style ingest as a future **consumer module** with hard boundary.
 
-### Order (strict)
+---
 
-1. **Package boundary lock** (this sprint)  
-2. **Integration surface** (SDK + OpenAPI + one golden path)  
-3. **Contract tests / lint** (hardening #7) — cheap insurance  
-4. **One consumer integration** (e.g. Clatters live-only) via packages only  
-5. **Capability modules:** HLS audience, then Echo — behind clear APIs  
+## Decision (this phase)
 
-Do **not** lead with UI cosmetics or with HLS/Echo feature sprawl inside `gateway-api` alone.
+**Phase name: Public operator product + economical scale path**
 
-## Why (architecture)
+Interactive WebRTC is the **sellable core** and is proven. Next work is **operator-facing product quality** and a **clear, cheap path to HLS** — not feature sprawl and not consumer-app work inside this monorepo.
 
-| Product truth | Implication |
-|---------------|-------------|
-| Economic win is **WebRTC self-host on cheap egress** (ADR-009) | Interactive plane is already the sellable core |
-| 10k passive needs **HLS+CDN**, not more SFU polish | HLS is a **second delivery plane**, not “finish the admin UI” |
-| Echo is optional cost/complexity | Keep deferred until a consumer requires replay |
-| Future multi-consumer SaaS | **Contracts and packages** matter more than new screens |
+### Strict order
 
-## Modular packaging (non-negotiable)
+| Step | Work | Why |
+|------|------|-----|
+| **S1** | Robust **public Admin** login + navigation + utility views | Operators must trust `/admin` as a product, not a paste-token page |
+| **S2** | Operator utilities (health, plane honesty, endpoints, usage, audit, integrate snippets) | Unblocks integrators without support tickets |
+| **S3** | **Egress / HLS capability** per ADR-010 (off by default on economic plane until needed) | Scale without linear SFU cost; stay economical |
+| **S4** | SDK/OpenAPI freeze polish for public consumption | Integration product, not more SFU knobs |
+| **S5** | Echo / file VOD | Only when a consumer requires replay |
 
-Freeze (or introduce) clear packages so features never glue into one ball:
-
-```text
-@softqraft/shared          # types, error codes, cost plane enums
-@softqraft/sdk             # only public app client (sessions/tokens/…)
-@softqraft/gateway-api     # HTTP control plane (thin; no app business logic)
-@softqraft/admin-ui        # optional extract later; OK as gateway/public for now
-deploy/*                   # ops only — no product logic
-```
-
-### Rules
-
-| Rule | Meaning |
-|------|---------|
-| **Apps never import gateway internals** | Only `@softqraft/sdk` or raw HTTP OpenAPI |
-| **New capabilities = capability profile** | e.g. `hybrid_live`, `room_composite_hls` — not one-off flags |
-| **Egress/HLS behind Gateway API** | Same session model; optional egress types — no second control plane |
-| **No Clatters types in shared** | Consumer-specific code stays in consumer repos |
-| **Admin is operator product** | Tenant API keys for apps; admin auth separate from LiveKit keys |
-
-### When HLS/Egress ships
-
-Add without splitting the monorepo into a mess:
-
-| Module | Responsibility |
-|--------|----------------|
-| Gateway egress routes | Already: start/stop/list — extend types only |
-| `@softqraft/sdk` | `startHlsEgress()`, `getPlayback()` |
-| `deploy/cdn/*` + env | Origin/CDN — ops package, not app |
-| Docs capability profile | `creator_live_hls` / `hybrid_live` |
-
-Echo later: same pattern (`room_composite_file`), not a new service name.
-
-## Explicit non-goals (this phase)
+### Explicit non-goals (this phase)
 
 - Multi-region mesh  
 - Billing engine inside Gateway  
-- Replacing consumer app UX (chat, gifts, moderation)  
-- Marketing “10k ready” without L1–L3 on CDN  
-- Large Admin redesign for aesthetics alone  
+- Consumer app UX (chat, gifts, auctions, sell studio)  
+- Re-enabling IVS/OBS as SoftQraft core (Twitch-style live later = **separate consumer module**, not Gateway glue)  
+- Marketing “10k ready” without L1–L3 CDN proof on economic plane  
+
+---
+
+## Product truths (unchanged)
+
+| Truth | Implication |
+|-------|-------------|
+| Economic win is **WebRTC self-host on cheap egress** (ADR-009) | Interactive plane stays default sellable surface |
+| 10k passive needs **HLS + CDN**, not more SFU polish | HLS is a **second delivery plane** (ADR-002 + ADR-010) |
+| LiveKit Cloud free tier remains a **consumer failover** | SoftQraft stays primary; Cloud is optional in *apps*, not in SoftQraft Gateway |
+| Multi-consumer SaaS later | Contracts/packages > new screens that mix consumer logic |
+
+---
+
+## Public Admin (S1–S2) — product requirements
+
+| Requirement | Meaning |
+|-------------|---------|
+| **Login-first** | Email/password session (P0.5); break-glass token secondary |
+| **Navigation** | Clear shell: Overview · Credentials · Usage · Audit · Integrate |
+| **Plane honesty** | Always show `demo` vs `economic_production` + cost claim note |
+| **Utility** | Copy gateway/realtime URLs; health/ready; usage since boot; audit |
+| **No LiveKit secrets in browser** | Only operator session cookie or break-glass admin token |
+
+UI may stay under `gateway-api/public/admin` until extract to `@softqraft/admin-ui` is justified.
+
+---
+
+## Egress / HLS (S3) — summary
+
+Full decision: **[ADR-010](../decisions/ADR-010-economical-egress-hls.md)**.
+
+| Mode | When | Cost posture |
+|------|------|----------------|
+| **Interactive only** (default) | Host + guests + modest WebRTC viewers | Cheapest; current Jari path |
+| **Recording egress** | Consumer needs MP4/VOD | On-demand egress job; object storage |
+| **HLS audience** | Passive viewers grow past SFU comfort | Egress → origin (R2/MinIO) → CDN pull |
+
+**Do not** run always-on HLS egress for every session on a small economic box. Enable per session / per tenant capability profile.
+
+---
 
 ## Success criteria (next 2–4 weeks)
 
 | Gate | Done when |
 |------|-----------|
-| **M1 Packages** | ✅ SDK v0.2 + package-boundaries.md (2026-08-06) |
-| **M2 Contract** | ✅ `ci.yml` + typecheck/unit tests (2026-08-06) |
-| **M3 Consumer** | One external app creates session + tokens + live via **SDK or documented HTTP only** |
-| **M4 Optional HLS** | Only if M3 needs audience scale; HLS start + playback URL via Gateway/SDK |
+| **S1 Admin shell** | Public login + nav views live on `media.softqraftlabs.com/admin/` |
+| **S2 Operator utility** | Ready status, plane, endpoints, usage, audit, integrate docs usable without SSH |
+| **S3 HLS path documented** | ADR-010 accepted; deploy knobs documented; no forced always-on egress |
+| **S4 Integrator path** | OpenAPI + SDK remain sole public contracts; no consumer types in shared |
 
-## Immediate engineering backlog (mapped)
-
-| Priority | Work |
-|----------|------|
-| P1 | Harden `@softqraft/sdk` + publish/docs (integration product) |
-| P1 | Freeze OpenAPI / gateway-api-v1 as source of truth |
-| P1 | Hardening #7 tests/lint on gateway + shared + sdk |
-| P2 | Light Admin UX: delete key, error banners (only if it unblocks integrators) |
-| P2 | First consumer dual-run (live-only) |
-| P3 | HLS + R2/CDN as capability (modular) |
-| P4 | Echo when product requires |
+---
 
 ## One-line CTO call
 
-**Productize the modular interactive core and one clean integration path; ship HLS/Egress as the next capability module after that — not UI sprawl and not unscoped expansion.**
+**Harden SoftQraft as a public operator + integrator product on the economic plane; keep interactive WebRTC default; ship HLS/egress only as an optional economical capability (ADR-010) — never as Jari/Clatters UI inside this repo.**

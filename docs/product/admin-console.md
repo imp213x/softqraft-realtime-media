@@ -1,16 +1,20 @@
-# Admin Console — API credentials
+# Admin Console — public operator UI
 
 **URL (local):** `http://localhost:8080/admin/`  
-**URL (prod demo):** `https://media.softqraftlabs.com/admin/`  
-**Credential store:** v2 hashed (hardening #6)
+**URL (economic / public):** `https://media.softqraftlabs.com/admin/`  
+**Credential store:** v2 hashed (hardening #6)  
+**Phase:** S1–S2 public shell — [cto-next-phase-decision.md](cto-next-phase-decision.md)
 
 ## Purpose
 
+Operator product for SoftQraft Realtime Media (not a consumer live-show UI):
+
+- Sign in (email/password session) · break-glass token secondary  
+- **Navigate:** Overview · Credentials · Usage · Audit · Integrate  
 - Generate **tenant API keys** for integrating apps  
-- Multi-key, rotate, revoke  
-- Audit trail of credential events  
-- Public Gateway + realtime endpoints  
-- Deployment plane + usage (ADR-009)
+- Multi-key, rotate, revoke · audit trail  
+- Public Gateway + realtime endpoints · plane honesty (ADR-009)  
+- Health/ready utility
 
 ## Auth (P0.5)
 
