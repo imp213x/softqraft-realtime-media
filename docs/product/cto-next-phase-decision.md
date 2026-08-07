@@ -92,7 +92,7 @@ Full decision: **[ADR-010](../decisions/ADR-010-economical-egress-hls.md)**.
 | **S1 Admin shell** | Public login + nav views live on `media.softqraftlabs.com/admin/` |
 | **S2 Operator utility** | Ready status, plane, endpoints, usage, audit, integrate docs usable without SSH |
 | **S3 HLS path documented** | ADR-010 accepted; deploy knobs documented; no forced always-on egress |
-| **S4 Integrator path** | OpenAPI + SDK remain sole public contracts; no consumer types in shared |
+| **S4 Integrator path** | OpenAPI 1.0.1 + SDK README + gateway-api-v1 aligned; sole public contracts; no consumer UI in SoftQraft |
 
 ---
 

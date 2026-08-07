@@ -1,14 +1,17 @@
-# Gateway API v1 (design)
+# Gateway API v1
 
 **Product:** SoftQraft Realtime Media (SoftQraft Labs Ltd.)  
+**Public base (economic):** `https://media.softqraftlabs.com`  
 **Base path:** `/v1`  
 **Style:** JSON over HTTPS  
-**Auth:** `Authorization: Bearer <service_api_key>` (consumer backends only)  
-**Source of truth (machine):** [openapi/openapi-v1.yaml](openapi/openapi-v1.yaml)  
+**Auth:** `Authorization: Bearer <tenant_api_key>` (integrating **backends** only — `sqk_…` from Admin)  
+**Source of truth (machine):** [openapi/openapi-v1.yaml](openapi/openapi-v1.yaml) (v1.0.1)  
 **TypeScript client:** [`@softqraft/sdk`](../../packages/sdk/README.md) (`GATEWAY_API_VERSION = "v1"`)  
-**Boundaries:** [package-boundaries.md](../product/package-boundaries.md)
+**Boundaries:** [package-boundaries.md](../product/package-boundaries.md)  
+**Egress economics:** [ADR-010](../decisions/ADR-010-economical-egress-hls.md)
 
-This is the **plug surface** for any consumer app. Media clients use LiveKit SDKs with tokens issued here.
+This is the **plug surface** for any consumer app. Media clients use LiveKit SDKs with tokens issued here.  
+**Not** this API: operator console (`/admin/`), end-user sell/viewer UI (lives in the consumer app).
 
 ---
 
@@ -19,7 +22,7 @@ This is the **plug surface** for any consumer app. Media clients use LiveKit SDK
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Liveness |
-| `GET` | `/ready` | Readiness (LiveKit + Redis reachable) |
+| `GET` | `/ready` | Readiness (`checks` may include livekit, redis, database, s3Configured, …) |
 
 ### Sessions (Live shows)
 
@@ -137,13 +140,21 @@ Roles (Gateway-normalized):
   "identity": "user_9",
   "role": "host",
   "expiresAt": "2026-08-02T13:00:00Z",
-  "realtimeUrl": "wss://realtime.media.example.com"
+  "realtimeUrl": "wss://realtime.softqraftlabs.com",
+  "iceServers": [
+    { "urls": "turn:YOUR_HOST:3478", "username": "…", "credential": "…" }
+  ]
 }
 ```
 
+Clients should prefer **`realtimeUrl` + `iceServers` from this response** over hard-coded LiveKit Cloud env when integrating SoftQraft.
+
 ### Start egress
 
-**File recording** (Clatters Echo-compatible pattern: room composite → MP4 → object storage):
+**Default:** interactive WebRTC only — **do not** start egress for every session (ADR-010).  
+**When needed:** large passive audience → HLS; product needs VOD → file composite.
+
+**File recording** (room composite → MP4 → object storage):
 
 ```http
 POST /v1/sessions/sess_01H.../egress
@@ -157,7 +168,7 @@ POST /v1/sessions/sess_01H.../egress
 }
 ```
 
-**HLS audience / archive** (large-scale profile):
+**HLS audience / archive** (opt-in scale path — ADR-010):
 
 ```http
 POST /v1/sessions/sess_01H.../egress
@@ -166,7 +177,6 @@ POST /v1/sessions/sess_01H.../egress
   "type": "room_composite_hls",
   "options": {
     "layout": "speaker",
-    "preset": "H264_720P_30",
     "segmentDurationSeconds": 2
   }
 }
@@ -176,7 +186,7 @@ Supported types (schema): `room_composite_file`, `room_composite_hls`, `room_com
 
 **Implemented now:** `room_composite_file`, `room_composite_hls`. Others return **`501`**.
 
-**Profiles are labels today:** `profile` is stored on the session but does **not** auto-start HLS, Echo, or hybrid audience paths. Callers must invoke egress (and later orchestration) explicitly. See [platform-maturity-assessment.md](../operations/platform-maturity-assessment.md) §10.
+**Profiles are labels today:** `profile` is stored on the session but does **not** auto-start HLS, Echo, or hybrid audience paths. Callers must invoke egress explicitly. Cap concurrent egress per tenant on the economic plane.
 
 **HLS playback status:** After start, `playback.status` may become `ready` when the Egress API accepts the job — **before** the playlist object exists. Treat early URLs as provisional until an active egress webhook / object probe (hardening backlog §7).
 

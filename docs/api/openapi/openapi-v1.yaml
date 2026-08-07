@@ -1,15 +1,24 @@
 openapi: 3.1.0
 info:
   title: SoftQraft Realtime Media Gateway API
-  version: 1.0.0
+  version: 1.0.1
   description: |
     SoftQraft Labs Ltd. — application-agnostic HTTP control plane for self-hosted LiveKit + Egress.
-    Any backend integrates here; media clients use LiveKit SDKs with minted tokens.
+    Any **backend** integrates here; media clients use LiveKit SDKs with minted tokens.
     Capability profiles gate interactive, creator-live, HLS broadcast, and recording features.
-    Recording file output may target AWS S3 (initial Echo posture); storage remains pluggable.
+
+    **Default product path:** interactive WebRTC (`creator_live_webrtc` / `interactive`).
+    **HLS / room-composite egress** is optional and on-demand — see ADR-010 (do not start HLS
+    for every session on the economic plane).
+
+    Typed client: `@softqraft/sdk` (Node/server only). Operator UI: `/admin/` (not part of this contract).
+    Consumer end-user UI stays in the integrating app (not SoftQraft).
+  contact:
+    name: SoftQraft Labs
+    url: https://media.softqraftlabs.com
 servers:
-  - url: https://gateway.media.example.com
-    description: Production (example)
+  - url: https://media.softqraftlabs.com
+    description: Economic production plane (public Gateway)
   - url: http://localhost:8080
     description: Local development
 tags:
@@ -17,6 +26,7 @@ tags:
   - name: Sessions
   - name: Tokens
   - name: Egress
+    description: On-demand only (ADR-010). Prefer WebRTC for small/medium audiences.
   - name: Playback
 paths:
   /health:
@@ -63,6 +73,12 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateSessionRequest"
       responses:
+        "200":
+          description: Existing session returned for the same idempotency key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
         "201":
           description: Session created
           content:
@@ -71,8 +87,14 @@ paths:
                 $ref: "#/components/schemas/Session"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "429":
+          description: Tenant session quota exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: Idempotency conflict
+          description: Conflict (e.g. room isolation)
           content:
             application/json:
               schema:
@@ -281,7 +303,9 @@ components:
     ServiceBearer:
       type: http
       scheme: bearer
-      description: Clatters backend service API key
+      description: |
+        Tenant service API key from SoftQraft Admin (`sqk_{keyId}.{secret}`)
+        or env bootstrap keys. Server-side only — never ship to browsers.
   parameters:
     SessionId:
       name: sessionId
@@ -318,15 +342,17 @@ components:
           enum: [ok]
     ReadyResponse:
       type: object
-      required: [status, checks]
+      required: [status]
       properties:
         status:
           type: string
           enum: [ready, not_ready]
         checks:
           type: object
-          additionalProperties:
-            type: boolean
+          additionalProperties: true
+          description: |
+            Implementation may include gateway, livekit, redis, database,
+            storeBackend, quotaBackend, s3Configured, etc.
     ErrorResponse:
       type: object
       required: [error]
@@ -401,6 +427,10 @@ components:
       properties:
         sessionId:
           type: string
+        tenantId:
+          type: string
+          nullable: true
+          description: Tenant from the API key when multi-tenant credentials are used
         externalId:
           type: string
           nullable: true
@@ -408,6 +438,9 @@ components:
           type: string
         profile:
           type: string
+        audienceMode:
+          type: string
+          enum: [hls, realtime, hybrid]
         status:
           type: string
           enum: [ready, live, ending, ended]
@@ -418,6 +451,7 @@ components:
             url:
               type: string
               format: uri
+              description: LiveKit WebSocket URL (wss://…)
         playback:
           type: object
           properties:
@@ -466,12 +500,27 @@ components:
           type: object
           additionalProperties:
             type: string
+    IceServer:
+      type: object
+      required: [urls]
+      properties:
+        urls:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        username:
+          type: string
+        credential:
+          type: string
     TokenResponse:
       type: object
-      required: [token, identity, role, expiresAt, realtimeUrl]
+      required: [token, identity, role, expiresAt, realtimeUrl, iceServers]
       properties:
         token:
           type: string
+          description: LiveKit JWT for Room.connect
         identity:
           type: string
         role:
@@ -482,6 +531,12 @@ components:
         realtimeUrl:
           type: string
           format: uri
+          description: Prefer this over env LIVEKIT_WS_URL when using SoftQraft
+        iceServers:
+          type: array
+          items:
+            $ref: "#/components/schemas/IceServer"
+          description: TURN/STUN servers from Gateway config (may be empty)
     StartEgressRequest:
       type: object
       required: [type]
@@ -494,9 +549,29 @@ components:
             - room_composite_rtmp
             - track
             - participant
-          description: Profile-gated egress kinds (file = MP4/VOD; hls = live/archive segments)
+          description: |
+            On-demand only (ADR-010). Supported on economic plane with capacity caps:
+            room_composite_file (VOD), room_composite_hls (passive scale).
+            Do not start HLS for every interactive session.
         options:
           type: object
+          properties:
+            fileType:
+              type: string
+            filepath:
+              type: string
+            keyTemplate:
+              type: string
+            layout:
+              type: string
+            segmentDurationSeconds:
+              type: integer
+              minimum: 1
+              maximum: 10
+            playlistName:
+              type: string
+            livePlaylistName:
+              type: string
           additionalProperties: true
     EgressJob:
       type: object

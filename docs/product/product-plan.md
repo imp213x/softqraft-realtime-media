@@ -42,7 +42,8 @@ See [ADR-009](../decisions/ADR-009-cost-planes-and-hosting-posture.md), [cost-po
 | **M1 package boundaries + SDK v0.2** | ✅ [package-boundaries.md](package-boundaries.md) |
 | **M2 contract tests/lint** | ✅ CI + unit tests |
 | **M3 first consumer (Jari HTTP + WebRTC)** | ✅ sell publish + viewer on economic plane |
-| **S1–S2 public Admin shell** | 🔄 login + nav + utilities |
+| **S1–S2 public Admin shell** | ✅ login + nav + utilities (economic deploy) |
+| **S4 integrator polish** | ✅ OpenAPI 1.0.1 + SDK/docs aligned |
 | HLS + CDN capability | ⏳ optional per [ADR-010](../decisions/ADR-010-economical-egress-hls.md) — off by default |
 | Economic plane deploy runbook | ✅ live Hetzner |
 | Echo / MP4 recording | ⏸ deferred until consumer needs VOD |

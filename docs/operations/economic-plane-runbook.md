@@ -62,4 +62,22 @@ Full narrative: [next-steps-handoff.md](../roadmap/next-steps-handoff.md) §2.
 ## HLS at scale
 
 On economic plane, large passive audiences still need **hybrid HLS + CDN**.  
-See [turn-hls-cdn.md](turn-hls-cdn.md).
+Policy: [ADR-010](../decisions/ADR-010-economical-egress-hls.md) (on-demand egress only).  
+Ops: [turn-hls-cdn.md](turn-hls-cdn.md).
+
+## Redeploy Gateway (Admin UI / API)
+
+Host keeps `deploy/docker/livekit/livekit.yaml` host-specific (`node_ip`). After git update:
+
+```bash
+cd /root/softqraft-realtime-media
+cp -a deploy/docker/livekit/livekit.yaml /root/livekit.yaml.hetzner.bak
+git fetch origin && git reset --hard origin/main
+cp -a /root/livekit.yaml.hetzner.bak deploy/docker/livekit/livekit.yaml
+bash deploy/scripts/build-gateway-host.sh
+cd deploy/compose
+docker compose -f docker-compose.yml -f docker-compose.prebuilt.yml --profile turn \
+  up -d --force-recreate --no-deps gateway
+curl -sS http://127.0.0.1:8080/ready
+curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/admin/
+```

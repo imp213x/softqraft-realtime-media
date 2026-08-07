@@ -23,13 +23,16 @@ Your players ──HLS────► CDN (URL from Gateway playback)
 ## Minimal backend flow (any app)
 
 1. Authenticate **your** user (your auth system).  
-2. `POST /v1/sessions` with `externalId` + `metadata` + desired `audience.mode`.  
-3. `POST /v1/sessions/{id}/tokens` with `identity` + `role`.  
-4. Client: `Room.connect(realtimeUrl, token)`.  
-5. Optional: `POST .../egress` for file recording and/or HLS.  
-6. Optional: `GET .../playback` for audience URLs.  
-7. `POST .../end` on teardown.  
-8. Handle webhooks for durable completion (recordings).
+2. Create a SoftQraft session (`SoftQraftClient.createSession` or `POST /v1/sessions`) with `externalId` + `metadata`. Prefer `profile: "creator_live_webrtc"` for interactive shows.  
+3. Mint a token (`mintToken` / `POST …/tokens`) with `identity` + `role`.  
+4. Client (in **your** app UI): `Room.connect(realtimeUrl, token, { rtcConfig: { iceServers } })` using fields from the token response.  
+5. Optional **only when needed** (ADR-010): `startHlsEgress` / `startFileEgress` — not on every session.  
+6. Optional: `getPlayback` for HLS audience URLs after egress is ready.  
+7. `endSession` on teardown.  
+8. Handle webhooks for durable completion (recordings) when using egress.
+
+**SDK golden path:** [`packages/sdk/README.md`](../../packages/sdk/README.md)  
+**OpenAPI:** [`docs/api/openapi/openapi-v1.yaml`](../api/openapi/openapi-v1.yaml)
 
 ## Choosing a profile
 
@@ -37,9 +40,9 @@ Your players ──HLS────► CDN (URL from Gateway playback)
 |--------------|--------|
 | Small interactive rooms only | `interactive` |
 | Creator live, all viewers on WebRTC | `creator_live_webrtc` |
-| Large audience, control bandwidth cost | `creator_live_hls` or `hybrid_live` |
-| Post-session MP4/VOD | `recording_only` or combine with a live profile |
-| Clatters-like Live + Echo | `creator_live_webrtc` + file recording (see consumer inventory) |
+| Large audience, control bandwidth cost | Keep WebRTC for stage; start **on-demand** `room_composite_hls` (ADR-010). Labels `creator_live_hls` / `hybrid_live` are stored on the session but do not auto-start egress today. |
+| Post-session MP4/VOD | Explicit `startFileEgress` when product needs replay |
+| Interactive marketplace live (e.g. Jari) | `creator_live_webrtc` only until passive scale requires HLS |
 
 ### Cost honesty (planes)
 
