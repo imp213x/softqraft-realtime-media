@@ -28,6 +28,11 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # shared main/types point at dist/; dist is gitignored so dependents
+      # (sdk, gateway-api) cannot resolve @softqraft/shared until shared is built.
+      - name: Build shared (declarations for dependents)
+        run: pnpm --filter @softqraft/shared build
+
       - name: Typecheck (lint contract)
         run: pnpm run typecheck
 
@@ -35,4 +40,4 @@ jobs:
         run: pnpm run test
 
       - name: Build packages
-        run: pnpm --filter @softqraft/shared build && pnpm --filter @softqraft/sdk build && pnpm --filter @softqraft/gateway-api build
+        run: pnpm --filter @softqraft/sdk build && pnpm --filter @softqraft/gateway-api build
