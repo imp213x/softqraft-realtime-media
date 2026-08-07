@@ -11,7 +11,7 @@ importers:
   packages/sdk:
     dependencies:
       '@softqraft/shared':
-        specifier: workspace:*
+        specifier: file:../shared
         version: link:../shared
     devDependencies:
       '@types/node':
