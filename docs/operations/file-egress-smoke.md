@@ -89,8 +89,25 @@ curl -sS -X POST "$GW/v1/sessions/<sessionId>/end" \
 2. If public GET works, integrators may implement B1–B5 in [echo-vod-r2-readiness.md](echo-vod-r2-readiness.md).  
 3. Do **not** leave long-running HLS jobs on the economic box (ADR-010).
 
+## Preferred smoke (with publisher)
+
+Empty rooms often hang on **`Start signal not received`**. Use:
+
+```bash
+bash deploy/scripts/smoke-file-egress-with-publisher.sh
+```
+
+This joins with `livekit-cli --publish-demo`, starts file egress, stops after ~active, expects **`complete`**.
+
+Also ensure egress can ICE to LiveKit media (on Hetzner Linux):
+
+```bash
+bash deploy/scripts/fix-egress-host-network.sh
+```
+
 ## Evidence log
 
 | Date (UTC) | Host | Result | Notes |
 |------------|------|--------|-------|
-| 2026-08-08 | Hetzner `2.28.61.173` | **PARTIAL** | Session + `POST …/egress` → **202**, `egressId` assigned. Job stayed `starting` ~3 min then aborted on stop: **`Start signal not received`** (LiveKit room-composite Chrome). **Fixed on host:** `egress.yaml` API keys aligned to `livekit.yaml` (were `softqraft_dev_*` mismatch). **Still blocking R2 write path:** host `.env` has placeholder `S3_ENDPOINT=https://<accountid>.r2.cloudflarestorage.com` and non-usable `HLS_PUBLIC_BASE_URL` — set real Cloudflare R2 account endpoint + public base, recreate **gateway**, re-run smoke. Prefer re-test with a **publisher** in the room (not empty session). |
+| 2026-08-08 | Hetzner `2.28.61.173` | **PARTIAL** | Empty-room smoke stuck `starting` → Start signal not received. Egress keys aligned; R2 endpoint + `hls.softqraftlabs.com` configured later. |
+| 2026-08-08 | Hetzner `2.28.61.173` | **PASS** | `smoke-file-egress-with-publisher.sh`: egress **active** then **complete** (`EG_WvBenLpD5wDU`). Chrome `START_RECORDING` after demo publisher. Path template `recordings/smoke-file-egress/sess_…-{time}.mp4` → R2 `sqrm-hls`. Host-network egress + real `S3_ENDPOINT` + `HLS_PUBLIC_BASE_URL=https://hls.softqraftlabs.com`. |

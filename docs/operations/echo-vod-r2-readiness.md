@@ -130,8 +130,10 @@ Scripts:
 
 | Script | Purpose |
 |--------|---------|
-| `deploy/scripts/smoke-file-egress.sh` | Create session → file egress → poll |
-| `deploy/scripts/fix-egress-keys-on-host.sh` | Align `egress.yaml` keys with `livekit.yaml` + recreate egress |
+| `deploy/scripts/smoke-file-egress-with-publisher.sh` | **Preferred** — demo publisher + file egress → `complete` |
+| `deploy/scripts/smoke-file-egress.sh` | Empty-room only (often hangs without publisher) |
+| `deploy/scripts/fix-egress-host-network.sh` | Egress `network_mode: host` (Hetzner WebRTC/ICE) |
+| `deploy/scripts/fix-egress-keys-on-host.sh` | Align `egress.yaml` keys with `livekit.yaml` |
 | `deploy/scripts/check-livekit-key-alignment.sh` | Verify gateway / livekit / egress keys match |
 
 ## Host config pitfalls (2026-08-08)
