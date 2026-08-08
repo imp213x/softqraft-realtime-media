@@ -68,6 +68,8 @@ export function toPublicEgress(job: EgressJobRecord) {
     sessionId: job.sessionId,
     type: job.type,
     status: job.status,
+    /** Object key / path for file egress (consumers build public URL). */
+    filepath: job.filepath ?? null,
     playback: job.playback,
     error: job.error,
     createdAt: job.createdAt,

@@ -48,10 +48,15 @@ export interface GatewayConfig {
   iceServers: IceServerConfig[];
   defaultTokenTtlSeconds: number;
   /**
-   * Optional consumer webhook URLs (e.g. Clatters /api/livekit/egress-webhook).
+   * Optional consumer webhook URLs (e.g. Jari /api/v1/streaming/softqraft/webhook).
    * LiveKit webhooks are verified then forwarded with the original signature.
    */
   webhookForwardUrls: string[];
+  /**
+   * Optional shared secret for consumer verification (header X-SoftQraft-Webhook-Secret).
+   * Prefer this for SoftQraft tenants that do not hold LiveKit API keys.
+   */
+  webhookForwardSharedSecret: string;
   /** Bearer break-glass admin token (phase B dual-mode with cookie sessions). */
   adminToken: string;
   /**
@@ -239,6 +244,8 @@ export function loadConfig(): GatewayConfig {
       .split(",")
       .map((u) => u.trim())
       .filter(Boolean),
+    /** Optional shared secret sent as X-SoftQraft-Webhook-Secret when forwarding to consumers. */
+    webhookForwardSharedSecret: env("WEBHOOK_FORWARD_SHARED_SECRET"),
     adminToken: env("GATEWAY_ADMIN_TOKEN"),
     adminBootstrapToken:
       env("GATEWAY_ADMIN_BOOTSTRAP_TOKEN") || env("GATEWAY_ADMIN_TOKEN"),

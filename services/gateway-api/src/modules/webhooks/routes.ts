@@ -88,7 +88,13 @@ export async function registerWebhookRoutes(
     if (config.webhookForwardUrls.length > 0) {
       const results = await Promise.allSettled(
         config.webhookForwardUrls.map((url) =>
-          forwardWebhook(url, rawBody, authHeader || token, req.log),
+          forwardWebhook(
+            url,
+            rawBody,
+            authHeader || token,
+            config.webhookForwardSharedSecret,
+            req.log,
+          ),
         ),
       );
       const failed = results.filter((r) => r.status === "rejected").length;
@@ -200,16 +206,22 @@ async function forwardWebhook(
   url: string,
   body: string,
   authorization: string,
+  sharedSecret: string,
   log: FastifyRequest["log"],
 ): Promise<void> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/webhook+json",
+    Authorization: authorization.startsWith("Bearer ")
+      ? authorization
+      : `Bearer ${authorization}`,
+  };
+  // Consumer apps (e.g. Jari SoftQraft mode) verify this instead of LiveKit JWT.
+  if (sharedSecret.trim()) {
+    headers["X-SoftQraft-Webhook-Secret"] = sharedSecret.trim();
+  }
   const res = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/webhook+json",
-      Authorization: authorization.startsWith("Bearer ")
-        ? authorization
-        : `Bearer ${authorization}`,
-    },
+    headers,
     body,
   });
   if (!res.ok) {

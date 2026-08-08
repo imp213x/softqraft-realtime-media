@@ -37,7 +37,8 @@ You do **not** need a second object store for SoftQraft’s default path. AWS S3
 | A6 | Prefer custom domain over `*.r2.dev` for production consumers | Optional but recommended |
 | A7 | Cap tenant `maxEgress` (economic plane) | ADR-010; avoid always-on jobs |
 | A8 | **Smoke:** one `room_composite_file` job completes and object is readable | See [file-egress-smoke.md](file-egress-smoke.md) |
-| A9 | Optional: `WEBHOOK_FORWARD_URLS` to consumer finalize URLs | Apps notified on egress complete |
+| A9 | `WEBHOOK_FORWARD_URLS` + optional `WEBHOOK_FORWARD_SHARED_SECRET` | Consumer (e.g. Jari) notified on egress complete |
+| A9b | **R2 lifecycle 30 days** on recording prefixes | Objects auto-expire (SoftQraft owns deletion) |
 | A10 | Document public URL pattern for integrators | Base + key template → final URL |
 
 ### B. Each consumer app (Jari, Clatters, …) — not SoftQraft
@@ -69,9 +70,17 @@ HLS_KEY_TEMPLATE=hls/{externalId}/{sessionId}
 HLS_PUBLIC_BASE_URL=https://pub-<id>.r2.dev   # or https://vod.example.com
 # CDN_PUBLIC_BASE_URL=https://cdn.example.com   # optional scale
 
-# Optional: notify consumers when egress finishes
-# WEBHOOK_FORWARD_URLS=https://your-app.example/api/webhooks/softqraft-egress
+# Notify consumers when egress finishes (LiveKit events, verified then forwarded)
+# WEBHOOK_FORWARD_URLS=https://api.jarilive.com/api/v1/streaming/softqraft/webhook
+# WEBHOOK_FORWARD_SHARED_SECRET=<shared with Jari SOFTQRAFT_WEBHOOK_SHARED_SECRET>
 ```
+
+### R2 lifecycle (30 days — SoftQraft owns)
+
+In Cloudflare R2 → bucket → **Settings → Object lifecycle rules**:
+
+- Expire objects after **30 days** for prefixes SoftQraft writes (`recordings/`, `jari-vod/`, `hls/`).  
+- Jari owns product UX (“available 30 days”); SoftQraft owns actual object deletion.
 
 Compose injects the same vars into the Gateway service. Egress receives S3 settings **per start request** from the Gateway (LiveKit SDK `S3Upload`), not only from `egress.yaml`.
 
