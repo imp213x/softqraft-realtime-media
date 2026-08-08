@@ -59,11 +59,27 @@ Full narrative: [next-steps-handoff.md](../roadmap/next-steps-handoff.md) §2.
 6. Compare host bandwidth bill to prior LiveKit Cloud GB.  
 7. Only then claim cost savings.
 
-## HLS at scale
+## HLS / Echo / VOD (R2)
 
-On economic plane, large passive audiences still need **hybrid HLS + CDN**.  
-Policy: [ADR-010](../decisions/ADR-010-economical-egress-hls.md) (on-demand egress only).  
-Ops: [turn-hls-cdn.md](turn-hls-cdn.md).
+- Readiness checklist: [echo-vod-r2-readiness.md](echo-vod-r2-readiness.md)  
+- File egress smoke: [file-egress-smoke.md](file-egress-smoke.md)  
+- Policy: [ADR-010](../decisions/ADR-010-economical-egress-hls.md) (on-demand egress only)  
+- CDN notes: [turn-hls-cdn.md](turn-hls-cdn.md)
+
+**Required in `deploy/compose/.env` on the host (no placeholders):**
+
+```bash
+S3_ENDPOINT=https://<YOUR_R2_ACCOUNT_ID>.r2.cloudflarestorage.com
+S3_BUCKET_NAME=sqrm-hls
+S3_FORCE_PATH_STYLE=true
+AWS_REGION=auto
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+HLS_PUBLIC_BASE_URL=https://pub-....r2.dev   # or custom domain
+RECORDING_KEY_TEMPLATE=recordings/{externalId}/{sessionId}-{time}.mp4
+```
+
+After editing R2 vars: recreate **gateway** (and ensure `fix-egress-keys-on-host.sh` if LiveKit keys rotated).
 
 ## Redeploy Gateway (Admin UI / API)
 

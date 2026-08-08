@@ -46,6 +46,8 @@ Self-hosted, app-agnostic live/realtime media (LiveKit + Egress + HTTP Gateway).
 | [product/cto-next-phase-decision.md](product/cto-next-phase-decision.md) | **Current CTO phase:** public Admin + economical HLS path |
 | [product/package-boundaries.md](product/package-boundaries.md) | M1 package freeze — SDK is the app boundary |
 | [decisions/ADR-010-economical-egress-hls.md](decisions/ADR-010-economical-egress-hls.md) | **Egress/HLS on economic plane** — on-demand, not always-on |
+| [operations/echo-vod-r2-readiness.md](operations/echo-vod-r2-readiness.md) | **R2 + Echo/VOD** checklist for SoftQraft + consumers |
+| [operations/file-egress-smoke.md](operations/file-egress-smoke.md) | File egress smoke on economic plane |
 | [operations/turn-hls-cdn.md](operations/turn-hls-cdn.md) | Market-grade TURN / HLS / CDN / tenants |
 | [operations/load-test-plan-10k.md](operations/load-test-plan-10k.md) | Phase 3e load-test plan |
 | [architecture/market-grade-product.md](architecture/market-grade-product.md) | Product stack others would pay for |
