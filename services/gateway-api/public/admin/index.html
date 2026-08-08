@@ -743,24 +743,44 @@ Authorization: Bearer <apiKey>
           }
           for (const t of tenants) {
             const tr = document.createElement("tr");
-            const keyLines = (t.keys || [])
-              .map(
-                (k) =>
-                  `<div class="mono" style="margin-bottom:0.25rem">${escapeHtml(k.keyPrefix)} <span class="muted">[${escapeHtml(k.status)}]</span><br/><span class="muted">${escapeHtml(k.keyId)}</span></div>`,
-              )
-              .join("") || '<span class="muted">no keys</span>';
+            // Keys column: each active key gets a Revoke control (API already supports DELETE …/keys/:keyId).
+            const keysCell = document.createElement("td");
+            const keys = t.keys || [];
+            if (!keys.length) {
+              keysCell.innerHTML = '<span class="muted">no keys</span>';
+            } else {
+              for (const k of keys) {
+                const row = document.createElement("div");
+                row.style.cssText = "margin-bottom:0.45rem;display:flex;flex-wrap:wrap;gap:0.35rem;align-items:flex-start";
+                const info = document.createElement("div");
+                info.className = "mono";
+                info.innerHTML = `${escapeHtml(k.keyPrefix)} <span class="muted">[${escapeHtml(k.status)}]</span><br/><span class="muted">${escapeHtml(k.keyId)}</span>`;
+                row.appendChild(info);
+                if (t.managed && k.status === "active") {
+                  const btnKeyRev = document.createElement("button");
+                  btnKeyRev.type = "button";
+                  btnKeyRev.className = "danger";
+                  btnKeyRev.textContent = "Revoke key";
+                  btnKeyRev.onclick = () => revokeOneKey(t.tenantId, k.keyId);
+                  row.appendChild(btnKeyRev);
+                }
+                keysCell.appendChild(row);
+              }
+            }
             tr.innerHTML = `
               <td><strong>${escapeHtml(t.tenantId)}</strong><br/><span class="muted">${escapeHtml(t.label || "")}</span>
               ${t.managed ? "" : '<br/><span class="muted">env bootstrap</span>'}</td>
-              <td>${keyLines}</td>
               <td class="muted">sess ${t.maxSessions} · egress ${t.maxEgress}</td>
               <td class="actions" style="margin:0"></td>`;
+            // Insert keys cell as second column (after tenant).
+            tr.insertBefore(keysCell, tr.children[1]);
             const actions = tr.lastElementChild;
             if (t.managed) {
               const btnRot = document.createElement("button");
               btnRot.type = "button";
               btnRot.className = "secondary inline";
               btnRot.textContent = "Rotate";
+              btnRot.title = "New key; previous active keys are revoked";
               btnRot.onclick = () => rotate(t.tenantId);
               actions.appendChild(btnRot);
               const btnAdd = document.createElement("button");
@@ -775,6 +795,13 @@ Authorization: Bearer <apiKey>
               btnRev.textContent = "Revoke all";
               btnRev.onclick = () => revoke(t.tenantId);
               actions.appendChild(btnRev);
+              const btnDel = document.createElement("button");
+              btnDel.type = "button";
+              btnDel.className = "danger";
+              btnDel.textContent = "Delete tenant";
+              btnDel.title = "Hard-delete tenant and all keys from the credential store";
+              btnDel.onclick = () => deleteTenantHard(t.tenantId);
+              actions.appendChild(btnDel);
             }
             body.appendChild(tr);
           }
@@ -814,6 +841,43 @@ Authorization: Bearer <apiKey>
           await api(`/admin/v1/credentials/${encodeURIComponent(tenantId)}`, {
             method: "DELETE",
           });
+          await loadList();
+          await loadMeta();
+          await loadAudit();
+        } catch (err) {
+          el("listErr").textContent = err.message || String(err);
+        }
+      }
+
+      /** Revoke a single key id (soft revoke — key stops working; row may remain as revoked). */
+      async function revokeOneKey(tenantId, keyId) {
+        if (!confirm(`Revoke key ${keyId} for tenant ${tenantId}?`)) return;
+        try {
+          await api(
+            `/admin/v1/credentials/${encodeURIComponent(tenantId)}/keys/${encodeURIComponent(keyId)}`,
+            { method: "DELETE" },
+          );
+          await loadList();
+          await loadAudit();
+        } catch (err) {
+          el("listErr").textContent = err.message || String(err);
+        }
+      }
+
+      /** Hard-delete tenant + keys from the store (irreversible). */
+      async function deleteTenantHard(tenantId) {
+        if (
+          !confirm(
+            `DELETE tenant "${tenantId}" permanently from the credential store?\nThis cannot be undone. Prefer Rotate / Revoke for normal key hygiene.`,
+          )
+        ) {
+          return;
+        }
+        try {
+          await api(
+            `/admin/v1/credentials/${encodeURIComponent(tenantId)}?hard=1`,
+            { method: "DELETE" },
+          );
           await loadList();
           await loadMeta();
           await loadAudit();

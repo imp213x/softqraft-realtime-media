@@ -85,15 +85,27 @@ POST https://media.softqraftlabs.com/v1/sessions
 Authorization: Bearer sqk_key_….secret
 ```
 
+## Credential hygiene (UI)
+
+| Control | Behaviour |
+|---------|-----------|
+| **Rotate** | Mints new key; **revokes previous active keys** (preferred daily hygiene) |
+| **Add key** | Extra active key (multi-key) without revoking others |
+| **Revoke key** | Soft-revoke one `keyId` (API `DELETE …/keys/:keyId`) |
+| **Revoke all** | Soft-revoke every key on the tenant |
+| **Delete tenant** | Hard-delete tenant + keys from store (`?hard=1`) — irreversible |
+
+Prefer **Rotate** over Delete for production tenants that still need a working key.
+
 ## Security posture (after #6)
 
 | Done | Still not production-IAM |
 |------|---------------------------|
 | Hashed keys on disk | No MFA / multi-admin users |
-| Multi-key + rotation | No rate limit / IP allowlist on `/admin` |
+| Multi-key + rotation + per-key revoke + hard delete UI | No rate limit / IP allowlist on `/admin` |
 | Audit log (file) | No external SIEM export |
-| Compose volume for data | Admin is still one static bearer |
-| Atomic file write | Prefer KMS / secret manager later |
+| Compose volume for data | Prefer KMS / secret manager later |
+| Atomic file write | |
 
 ## Related
 

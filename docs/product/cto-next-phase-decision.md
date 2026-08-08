@@ -89,10 +89,11 @@ Full decision: **[ADR-010](../decisions/ADR-010-economical-egress-hls.md)**.
 
 | Gate | Done when |
 |------|-----------|
-| **S1 Admin shell** | Public login + nav views live on `media.softqraftlabs.com/admin/` |
-| **S2 Operator utility** | Ready status, plane, endpoints, usage, audit, integrate docs usable without SSH |
-| **S3 HLS path documented** | ADR-010 accepted; deploy knobs documented; no forced always-on egress |
-| **S4 Integrator path** | OpenAPI 1.0.1 + SDK README + gateway-api-v1 aligned; sole public contracts; no consumer UI in SoftQraft |
+| **S1 Admin shell** | ✅ Public login + nav on `media.softqraftlabs.com/admin/` |
+| **S2 Operator utility** | ✅ Ready, plane, endpoints, usage, audit, integrate; credential revoke/delete UI |
+| **S3 HLS path documented** | ✅ ADR-010 + R2 readiness; on-demand egress |
+| **S4 Integrator path** | ✅ OpenAPI/SDK docs; first consumer (Jari) live on economic plane |
+| **Next** | Harden ops docs; optional HLS smoke; Admin IAM later — not consumer UX |
 
 ---
 
