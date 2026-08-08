@@ -556,7 +556,12 @@
       }
 
       async function api(path, { method = "GET", body, auth = true } = {}) {
-        const headers = { "Content-Type": "application/json" };
+        // Only set JSON content-type when a body is sent. DELETE with empty
+        // body + application/json is rejected by Fastify (FST_ERR_CTP_EMPTY_JSON_BODY → 400).
+        const headers = {};
+        if (body !== undefined) {
+          headers["Content-Type"] = "application/json";
+        }
         if (auth && breakGlassToken) {
           headers.Authorization = `Bearer ${breakGlassToken}`;
         }
@@ -564,7 +569,7 @@
           method,
           credentials: "include",
           headers,
-          body: body ? JSON.stringify(body) : undefined,
+          body: body !== undefined ? JSON.stringify(body) : undefined,
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
