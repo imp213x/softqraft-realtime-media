@@ -62,8 +62,10 @@ Atomic write: temp file + rename.
 | `POST` | `/admin/v1/credentials/:tenantId/keys` | Add key (no revoke) |
 | `POST` | `/admin/v1/credentials/:tenantId/rotate` | New key + revoke previous |
 | `DELETE` | `/admin/v1/credentials/:tenantId/keys/:keyId` | Revoke one key |
-| `DELETE` | `/admin/v1/credentials/:tenantId` | Revoke all keys |
-| `DELETE` | `/admin/v1/credentials/:tenantId?hard=1` | Delete tenant + keys from store |
+| `DELETE` | `/admin/v1/credentials/:tenantId` | Revoke all keys (tenant row remains) |
+| `DELETE` | `/admin/v1/credentials/:tenantId?hard=1` | Delete tenant + keys from store only — **does not clear Usage** |
+
+**UI (Credentials → Actions):** managed tenants show **Rotate · Add key · Revoke all · Delete tenant**, plus **Revoke key** next to each active key. Env-bootstrap tenants show a note to edit `GATEWAY_TENANTS` / `GATEWAY_SERVICE_API_KEYS` (no file delete). Usage is process-lifetime and independent of credential CRUD.
 
 ### Create response (once)
 

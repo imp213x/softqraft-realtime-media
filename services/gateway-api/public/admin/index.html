@@ -454,12 +454,16 @@
                     <th>Tenant</th>
                     <th>Keys</th>
                     <th>Quotas</th>
-                    <th></th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="credBody"></tbody>
               </table>
             </div>
+            <p class="muted" style="margin-top:0.5rem">
+              <strong>Delete tenant</strong> removes the tenant + keys from the credential store only.
+              It does <em>not</em> clear Usage (Usage resets only when the Gateway process restarts).
+            </p>
             <p class="err" id="listErr"></p>
           </section>
         </div>
@@ -468,6 +472,9 @@
         <div class="view" id="view-usage">
           <section class="card">
             <h2>Usage (since Gateway start)</h2>
+            <p class="muted" style="margin:0 0 0.65rem">
+              In-process counters. Independent of Credentials delete/revoke. Values reset to zero when Gateway restarts — not when you delete a tenant.
+            </p>
             <div class="usage-grid" id="usageGrid"></div>
             <p class="muted" id="usageNote" style="margin-top:0.65rem"></p>
             <button type="button" class="secondary" id="btnUsage">Refresh usage</button>
@@ -730,6 +737,16 @@ Authorization: Bearer <apiKey>
         }
       }
 
+      function makeBtn(label, className, onClick, title) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = className;
+        b.textContent = label;
+        if (title) b.title = title;
+        b.onclick = onClick;
+        return b;
+      }
+
       async function loadList() {
         el("listErr").textContent = "";
         try {
@@ -738,71 +755,107 @@ Authorization: Bearer <apiKey>
           body.innerHTML = "";
           const tenants = data.tenants || [];
           if (!tenants.length) {
-            body.innerHTML = `<tr><td colspan="4" class="muted">No tenants yet</td></tr>`;
+            body.innerHTML = `<tr><td colspan="4" class="muted">No tenants yet — create one above</td></tr>`;
             return;
           }
           for (const t of tenants) {
             const tr = document.createElement("tr");
-            // Keys column: each active key gets a Revoke control (API already supports DELETE …/keys/:keyId).
-            const keysCell = document.createElement("td");
+
+            // 1) Tenant
+            const tdTenant = document.createElement("td");
+            tdTenant.innerHTML =
+              `<strong>${escapeHtml(t.tenantId)}</strong>` +
+              (t.label
+                ? `<br/><span class="muted">${escapeHtml(t.label)}</span>`
+                : "") +
+              (t.managed
+                ? ""
+                : '<br/><span class="muted">env bootstrap (not file-managed)</span>');
+            tr.appendChild(tdTenant);
+
+            // 2) Keys (+ per-key Revoke for managed active keys)
+            const tdKeys = document.createElement("td");
             const keys = t.keys || [];
             if (!keys.length) {
-              keysCell.innerHTML = '<span class="muted">no keys</span>';
+              tdKeys.innerHTML = '<span class="muted">no keys</span>';
             } else {
               for (const k of keys) {
                 const row = document.createElement("div");
-                row.style.cssText = "margin-bottom:0.45rem;display:flex;flex-wrap:wrap;gap:0.35rem;align-items:flex-start";
+                row.style.cssText =
+                  "margin-bottom:0.45rem;display:flex;flex-wrap:wrap;gap:0.35rem;align-items:center";
                 const info = document.createElement("div");
                 info.className = "mono";
-                info.innerHTML = `${escapeHtml(k.keyPrefix)} <span class="muted">[${escapeHtml(k.status)}]</span><br/><span class="muted">${escapeHtml(k.keyId)}</span>`;
+                info.innerHTML =
+                  `${escapeHtml(k.keyPrefix)} <span class="muted">[${escapeHtml(k.status)}]</span>` +
+                  `<br/><span class="muted">${escapeHtml(k.keyId)}</span>`;
                 row.appendChild(info);
                 if (t.managed && k.status === "active") {
-                  const btnKeyRev = document.createElement("button");
-                  btnKeyRev.type = "button";
-                  btnKeyRev.className = "danger";
-                  btnKeyRev.textContent = "Revoke key";
-                  btnKeyRev.onclick = () => revokeOneKey(t.tenantId, k.keyId);
-                  row.appendChild(btnKeyRev);
+                  row.appendChild(
+                    makeBtn(
+                      "Revoke key",
+                      "danger inline",
+                      () => revokeOneKey(t.tenantId, k.keyId),
+                      "Soft-revoke this key only; tenant stays",
+                    ),
+                  );
                 }
-                keysCell.appendChild(row);
+                tdKeys.appendChild(row);
               }
             }
-            tr.innerHTML = `
-              <td><strong>${escapeHtml(t.tenantId)}</strong><br/><span class="muted">${escapeHtml(t.label || "")}</span>
-              ${t.managed ? "" : '<br/><span class="muted">env bootstrap</span>'}</td>
-              <td class="muted">sess ${t.maxSessions} · egress ${t.maxEgress}</td>
-              <td class="actions" style="margin:0"></td>`;
-            // Insert keys cell as second column (after tenant).
-            tr.insertBefore(keysCell, tr.children[1]);
-            const actions = tr.lastElementChild;
+            tr.appendChild(tdKeys);
+
+            // 3) Quotas
+            const tdQuota = document.createElement("td");
+            tdQuota.className = "muted";
+            tdQuota.textContent = `sess ${t.maxSessions} · egress ${t.maxEgress}`;
+            tr.appendChild(tdQuota);
+
+            // 4) Actions — always populated (never an empty column)
+            const tdAct = document.createElement("td");
+            tdAct.className = "actions";
+            tdAct.style.margin = "0";
             if (t.managed) {
-              const btnRot = document.createElement("button");
-              btnRot.type = "button";
-              btnRot.className = "secondary inline";
-              btnRot.textContent = "Rotate";
-              btnRot.title = "New key; previous active keys are revoked";
-              btnRot.onclick = () => rotate(t.tenantId);
-              actions.appendChild(btnRot);
-              const btnAdd = document.createElement("button");
-              btnAdd.type = "button";
-              btnAdd.className = "secondary inline";
-              btnAdd.textContent = "Add key";
-              btnAdd.onclick = () => addKey(t.tenantId);
-              actions.appendChild(btnAdd);
-              const btnRev = document.createElement("button");
-              btnRev.type = "button";
-              btnRev.className = "danger";
-              btnRev.textContent = "Revoke all";
-              btnRev.onclick = () => revoke(t.tenantId);
-              actions.appendChild(btnRev);
-              const btnDel = document.createElement("button");
-              btnDel.type = "button";
-              btnDel.className = "danger";
-              btnDel.textContent = "Delete tenant";
-              btnDel.title = "Hard-delete tenant and all keys from the credential store";
-              btnDel.onclick = () => deleteTenantHard(t.tenantId);
-              actions.appendChild(btnDel);
+              tdAct.appendChild(
+                makeBtn(
+                  "Rotate",
+                  "secondary inline",
+                  () => rotate(t.tenantId),
+                  "Issue a new key and revoke previous active keys",
+                ),
+              );
+              tdAct.appendChild(
+                makeBtn(
+                  "Add key",
+                  "secondary inline",
+                  () => addKey(t.tenantId),
+                  "Add another active key without revoking others",
+                ),
+              );
+              tdAct.appendChild(
+                makeBtn(
+                  "Revoke all",
+                  "danger inline",
+                  () => revoke(t.tenantId),
+                  "Revoke every active key; tenant row remains",
+                ),
+              );
+              tdAct.appendChild(
+                makeBtn(
+                  "Delete tenant",
+                  "danger inline",
+                  () => deleteTenantHard(t.tenantId),
+                  "Hard-delete tenant + keys from the credential store (does not clear Usage)",
+                ),
+              );
+            } else {
+              const note = document.createElement("span");
+              note.className = "muted";
+              note.textContent =
+                "Remove via GATEWAY_TENANTS / GATEWAY_SERVICE_API_KEYS (env bootstrap)";
+              tdAct.appendChild(note);
             }
+            tr.appendChild(tdAct);
+
             body.appendChild(tr);
           }
         } catch (err) {
@@ -864,11 +917,11 @@ Authorization: Bearer <apiKey>
         }
       }
 
-      /** Hard-delete tenant + keys from the store (irreversible). */
+      /** Hard-delete tenant + keys from the store (irreversible). Does not touch Usage meters. */
       async function deleteTenantHard(tenantId) {
         if (
           !confirm(
-            `DELETE tenant "${tenantId}" permanently from the credential store?\nThis cannot be undone. Prefer Rotate / Revoke for normal key hygiene.`,
+            `DELETE tenant "${tenantId}" permanently from the credential store?\n\nThis removes the tenant and keys only.\nUsage counters are NOT cleared (they only reset when Gateway restarts).\n\nThis cannot be undone. Prefer Rotate / Revoke for normal key hygiene.`,
           )
         ) {
           return;
@@ -878,6 +931,7 @@ Authorization: Bearer <apiKey>
             `/admin/v1/credentials/${encodeURIComponent(tenantId)}?hard=1`,
             { method: "DELETE" },
           );
+          // Credentials only — do not call anything that resets usage.
           await loadList();
           await loadMeta();
           await loadAudit();

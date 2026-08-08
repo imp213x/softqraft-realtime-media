@@ -170,7 +170,12 @@ export async function registerAdminRoutes(
   app.get("/admin/", async (_req, reply) => {
     try {
       const html = await readFile(adminHtmlPath, "utf8");
-      return reply.type("text/html").send(html);
+      // Avoid browsers/CDNs serving a stale console without delete controls.
+      return reply
+        .header("Cache-Control", "no-store, no-cache, must-revalidate")
+        .header("Pragma", "no-cache")
+        .type("text/html")
+        .send(html);
     } catch {
       return reply
         .status(500)
@@ -356,12 +361,13 @@ export async function registerAdminRoutes(
     }
   });
 
+  // Usage is process-lifetime only. Credential revoke/delete must never reset these counters.
   app.get("/admin/v1/usage", async (req, reply) => {
     try {
       await requireAdmin(req, config, authStore);
       return reply.send({
         usage: usage.snapshot(),
-        note: "In-process counters since Gateway start. GB is a proxy (maxParticipants × bitrate), not measured WebRTC bytes.",
+        note: "In-process counters since Gateway start (resets only on process restart — not on tenant delete/revoke). GB is a proxy (maxParticipants × bitrate), not measured WebRTC bytes.",
       });
     } catch (err) {
       return sendError(req, reply, err);
