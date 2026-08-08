@@ -206,6 +206,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgres://softqraft:softqraft@postgres:5432/softqraft_gateway}
       QUOTA_BACKEND: ${QUOTA_BACKEND:-redis}
       TENANT_STORE_PATH: ${TENANT_STORE_PATH:-/data/tenants.json}
+      USAGE_STORE_PATH: ${USAGE_STORE_PATH:-/data/usage.json}
       # S3/R2 — allow .env to override MinIO defaults (was hardcoded minio; broke R2)
       S3_BUCKET_NAME: ${S3_BUCKET_NAME:-sqrm-recordings}
       AWS_REGION: ${AWS_REGION:-us-east-1}

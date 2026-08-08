@@ -57,7 +57,27 @@ async function main() {
     quotas = new MemoryQuotaTracker();
   }
 
-  const usage = new UsageMeter();
+  const usage = new UsageMeter({ storePath: config.usageStorePath });
+  const loadedUsage = await usage.loadFromDisk();
+  if (!loadedUsage && storeBackend === "postgres") {
+    // Rebuild counters from durable sessions after deploy wiped in-memory meter
+    const pg = store as Awaited<
+      ReturnType<typeof createPostgresSessionStore>
+    >;
+    if (typeof pg.listAllForUsage === "function") {
+      const sessions = await pg.listAllForUsage();
+      const egress =
+        typeof pg.countEgressJobs === "function"
+          ? await pg.countEgressJobs()
+          : { started: 0, completed: 0 };
+      if (sessions.length > 0 || egress.started > 0) {
+        usage.restoreFromSessions(sessions, {
+          egressStarted: egress.started,
+          egressCompleted: egress.completed,
+        });
+      }
+    }
+  }
   const credentials = new CredentialStore({
     storePath: config.tenantStorePath,
     legacyKeys: config.serviceApiKeys,
@@ -128,6 +148,8 @@ async function main() {
         (await adminAuth.countOperators()) > 0,
       adminOperators: await adminAuth.countOperators(),
       tenantStorePath: config.tenantStorePath,
+      usageStorePath: config.usageStorePath,
+      usageRestored: usage.snapshot().restored ?? false,
       tenantCount: credentials.tenantCount(),
       iceServers: config.iceServers.map((s) => ({
         urls: s.urls,

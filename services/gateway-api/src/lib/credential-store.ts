@@ -38,6 +38,7 @@ export type AuditAction =
   | "tenant.revoked"
   | "key.created"
   | "key.revoked"
+  | "key.deleted"
   | "key.rotated"
   | "store.migrated_v1";
 
@@ -622,6 +623,28 @@ export class CredentialStore {
     this.keysById.set(keyId, rec);
     this.pushAudit({ action: "key.revoked", tenantId, keyId });
     if (persist) await this.persist();
+    return true;
+  }
+
+  /**
+   * Hard-delete one managed key from the store (removes the row entirely).
+   * Prefer this when cleaning revoked clutter; soft-revoke via revokeKey.
+   */
+  async deleteKey(tenantIdRaw: string, keyId: string): Promise<boolean> {
+    const tenantId = sanitizeTenantId(tenantIdRaw);
+    const rec = this.keysById.get(keyId);
+    if (!rec || rec.tenantId !== tenantId) return false;
+    if (!rec.managed) {
+      throw new Error("Cannot delete env-bootstrap key from admin");
+    }
+    this.unindexKey(rec);
+    this.pushAudit({
+      action: "key.deleted",
+      tenantId,
+      keyId,
+      detail: "hard-deleted",
+    });
+    await this.persist();
     return true;
   }
 

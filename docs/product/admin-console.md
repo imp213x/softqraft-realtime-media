@@ -61,11 +61,12 @@ Atomic write: temp file + rename.
 | `PATCH` | `/admin/v1/credentials/:tenantId` | Update label / quotas |
 | `POST` | `/admin/v1/credentials/:tenantId/keys` | Add key (no revoke) |
 | `POST` | `/admin/v1/credentials/:tenantId/rotate` | New key + revoke previous |
-| `DELETE` | `/admin/v1/credentials/:tenantId/keys/:keyId` | Revoke one key |
-| `DELETE` | `/admin/v1/credentials/:tenantId` | Revoke all keys (tenant row remains) |
-| `DELETE` | `/admin/v1/credentials/:tenantId?hard=1` | Delete tenant + keys from store only — **does not clear Usage** |
+| `DELETE` | `/admin/v1/credentials/:tenantId/keys/:keyId` | Soft-revoke one key (row stays as revoked) |
+| `DELETE` | `/admin/v1/credentials/:tenantId/keys/:keyId?hard=1` | **Delete one key** from store |
+| `DELETE` | `/admin/v1/credentials/:tenantId` | Soft-revoke all keys (tenant row remains) |
+| `DELETE` | `/admin/v1/credentials/:tenantId?hard=1` | Delete tenant + all keys — **does not clear Usage** |
 
-**UI (Credentials → Actions):** managed tenants show **Rotate · Add key · Revoke all · Delete tenant**, plus **Revoke key** next to each active key. Env-bootstrap tenants show a note to edit `GATEWAY_TENANTS` / `GATEWAY_SERVICE_API_KEYS` (no file delete). Usage is process-lifetime and independent of credential CRUD.
+**UI (Credentials):** each key has **Delete key**; tenant Actions show **Rotate · Add key · Delete tenant** (no dual Revoke buttons). Env-bootstrap tenants: edit `GATEWAY_TENANTS` / `GATEWAY_SERVICE_API_KEYS`. Usage is **file-persisted** (`USAGE_STORE_PATH`, default `/data/usage.json`) and can rebuild from Postgres sessions after a wipe.
 
 ### Create response (once)
 

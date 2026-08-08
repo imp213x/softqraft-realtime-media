@@ -154,6 +154,27 @@ describe("CredentialStore", () => {
     assert.ok(events.some((e) => e.action === "key.created"));
   });
 
+  it("hard-deletes a single key without removing the tenant", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "sq-cred-"));
+    const store = new CredentialStore({
+      storePath: path.join(dir, "tenants.json"),
+      legacyKeys: new Set(),
+      envTenants: [],
+    });
+    const a = await store.create({ tenantId: "del-key" });
+    const b = await store.createKey("del-key", { label: "second" });
+    assert.equal(await store.deleteKey("del-key", a.keyId), true);
+    assert.equal(store.resolve(a.apiKey), null);
+    assert.ok(store.resolve(b.apiKey));
+    const tenants = store.listTenants();
+    assert.equal(tenants.length, 1);
+    assert.equal(tenants[0]?.keys.length, 1);
+    assert.equal(tenants[0]?.keys[0]?.keyId, b.keyId);
+    assert.ok(
+      store.listAudit(10).some((e) => e.action === "key.deleted"),
+    );
+  });
+
   it("rejects expired keys", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "sq-cred-"));
     const store = new CredentialStore({

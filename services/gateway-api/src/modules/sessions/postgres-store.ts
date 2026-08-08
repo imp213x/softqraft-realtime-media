@@ -284,6 +284,40 @@ export class PostgresSessionStore implements SessionStore {
     );
     return res.rows.map(rowToEgress);
   }
+
+  /** Lightweight rows for usage-meter rebuild after process restart. */
+  async listAllForUsage(): Promise<
+    Array<{
+      createdAt: string;
+      endedAt: string | null;
+      status: string;
+      maxParticipants: number;
+    }>
+  > {
+    const res = await this.pool.query(
+      `SELECT created_at, ended_at, status, max_participants FROM sessions`,
+    );
+    return res.rows.map((row) => ({
+      createdAt: toIso(row.created_at),
+      endedAt: row.ended_at == null ? null : toIso(row.ended_at),
+      status: String(row.status),
+      maxParticipants: Number(row.max_participants ?? 50),
+    }));
+  }
+
+  async countEgressJobs(): Promise<{ started: number; completed: number }> {
+    const res = await this.pool.query(
+      `SELECT
+         count(*)::int AS started,
+         count(*) FILTER (WHERE status IN ('complete', 'completed', 'ended'))::int AS completed
+       FROM egress_jobs`,
+    );
+    const row = res.rows[0] as { started?: number; completed?: number } | undefined;
+    return {
+      started: Number(row?.started ?? 0),
+      completed: Number(row?.completed ?? 0),
+    };
+  }
 }
 
 function rowToSession(row: Record<string, unknown>): SessionRecord {

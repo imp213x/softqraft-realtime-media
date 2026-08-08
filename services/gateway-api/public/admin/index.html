@@ -461,8 +461,9 @@
               </table>
             </div>
             <p class="muted" style="margin-top:0.5rem">
-              <strong>Delete tenant</strong> removes the tenant + keys from the credential store only.
-              It does <em>not</em> clear Usage (Usage resets only when the Gateway process restarts).
+              <strong>Delete key</strong> removes that key only.
+              <strong>Delete tenant</strong> removes the whole tenant and all its keys.
+              Neither clears Usage.
             </p>
             <p class="err" id="listErr"></p>
           </section>
@@ -471,9 +472,9 @@
         <!-- USAGE -->
         <div class="view" id="view-usage">
           <section class="card">
-            <h2>Usage (since Gateway start)</h2>
+            <h2>Usage</h2>
             <p class="muted" style="margin:0 0 0.65rem">
-              In-process counters. Independent of Credentials delete/revoke. Values reset to zero when Gateway restarts — not when you delete a tenant.
+              Persisted counters (survive Gateway restarts). Independent of Credentials delete.
             </p>
             <div class="usage-grid" id="usageGrid"></div>
             <p class="muted" id="usageNote" style="margin-top:0.65rem"></p>
@@ -773,7 +774,7 @@ Authorization: Bearer <apiKey>
                 : '<br/><span class="muted">env bootstrap (not file-managed)</span>');
             tr.appendChild(tdTenant);
 
-            // 2) Keys (+ per-key Revoke for managed active keys)
+            // 2) Keys — one Delete key control per key (no duplicate Revoke all)
             const tdKeys = document.createElement("td");
             const keys = t.keys || [];
             if (!keys.length) {
@@ -789,13 +790,13 @@ Authorization: Bearer <apiKey>
                   `${escapeHtml(k.keyPrefix)} <span class="muted">[${escapeHtml(k.status)}]</span>` +
                   `<br/><span class="muted">${escapeHtml(k.keyId)}</span>`;
                 row.appendChild(info);
-                if (t.managed && k.status === "active") {
+                if (t.managed) {
                   row.appendChild(
                     makeBtn(
-                      "Revoke key",
+                      "Delete key",
                       "danger inline",
-                      () => revokeOneKey(t.tenantId, k.keyId),
-                      "Soft-revoke this key only; tenant stays",
+                      () => deleteOneKey(t.tenantId, k.keyId, k.keyPrefix),
+                      "Permanently remove this key from the store",
                     ),
                   );
                 }
@@ -810,7 +811,7 @@ Authorization: Bearer <apiKey>
             tdQuota.textContent = `sess ${t.maxSessions} · egress ${t.maxEgress}`;
             tr.appendChild(tdQuota);
 
-            // 4) Actions — always populated (never an empty column)
+            // 4) Tenant-level actions only (no Revoke all — use Delete key per row)
             const tdAct = document.createElement("td");
             tdAct.className = "actions";
             tdAct.style.margin = "0";
@@ -833,18 +834,10 @@ Authorization: Bearer <apiKey>
               );
               tdAct.appendChild(
                 makeBtn(
-                  "Revoke all",
-                  "danger inline",
-                  () => revoke(t.tenantId),
-                  "Revoke every active key; tenant row remains",
-                ),
-              );
-              tdAct.appendChild(
-                makeBtn(
                   "Delete tenant",
                   "danger inline",
                   () => deleteTenantHard(t.tenantId),
-                  "Hard-delete tenant + keys from the credential store (does not clear Usage)",
+                  "Remove entire tenant and all keys (does not clear Usage)",
                 ),
               );
             } else {
@@ -888,26 +881,19 @@ Authorization: Bearer <apiKey>
         }
       }
 
-      async function revoke(tenantId) {
-        if (!confirm(`Revoke all keys for ${tenantId}?`)) return;
-        try {
-          await api(`/admin/v1/credentials/${encodeURIComponent(tenantId)}`, {
-            method: "DELETE",
-          });
-          await loadList();
-          await loadMeta();
-          await loadAudit();
-        } catch (err) {
-          el("listErr").textContent = err.message || String(err);
+      /** Hard-delete one key (removes the row). Tenant stays. Does not touch Usage. */
+      async function deleteOneKey(tenantId, keyId, keyPrefix) {
+        const label = keyPrefix || keyId;
+        if (
+          !confirm(
+            `Delete key ${label} (${keyId}) for tenant "${tenantId}"?\n\nThis permanently removes that key. Other keys and the tenant stay.\nUsage is not cleared.`,
+          )
+        ) {
+          return;
         }
-      }
-
-      /** Revoke a single key id (soft revoke — key stops working; row may remain as revoked). */
-      async function revokeOneKey(tenantId, keyId) {
-        if (!confirm(`Revoke key ${keyId} for tenant ${tenantId}?`)) return;
         try {
           await api(
-            `/admin/v1/credentials/${encodeURIComponent(tenantId)}/keys/${encodeURIComponent(keyId)}`,
+            `/admin/v1/credentials/${encodeURIComponent(tenantId)}/keys/${encodeURIComponent(keyId)}?hard=1`,
             { method: "DELETE" },
           );
           await loadList();
@@ -917,11 +903,11 @@ Authorization: Bearer <apiKey>
         }
       }
 
-      /** Hard-delete tenant + keys from the store (irreversible). Does not touch Usage meters. */
+      /** Hard-delete tenant + all keys (irreversible). Does not touch Usage meters. */
       async function deleteTenantHard(tenantId) {
         if (
           !confirm(
-            `DELETE tenant "${tenantId}" permanently from the credential store?\n\nThis removes the tenant and keys only.\nUsage counters are NOT cleared (they only reset when Gateway restarts).\n\nThis cannot be undone. Prefer Rotate / Revoke for normal key hygiene.`,
+            `DELETE tenant "${tenantId}" permanently?\n\nRemoves the tenant and ALL of its keys.\nTo remove one key only, use Delete key next to that key.\nUsage is not cleared.\n\nThis cannot be undone.`,
           )
         ) {
           return;
@@ -931,7 +917,6 @@ Authorization: Bearer <apiKey>
             `/admin/v1/credentials/${encodeURIComponent(tenantId)}?hard=1`,
             { method: "DELETE" },
           );
-          // Credentials only — do not call anything that resets usage.
           await loadList();
           await loadMeta();
           await loadAudit();

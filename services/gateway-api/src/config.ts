@@ -66,6 +66,8 @@ export interface GatewayConfig {
   adminBootstrapToken: string;
   /** JSON file for admin-generated API keys */
   tenantStorePath: string;
+  /** JSON file for usage counters (survives restarts) */
+  usageStorePath: string;
   /** File fallback for admin operators when DATABASE_URL empty */
   adminAuthStorePath: string;
   /** Secure cookies when true (default: PUBLIC_GATEWAY_URL is https) */
@@ -253,6 +255,10 @@ export function loadConfig(): GatewayConfig {
       "TENANT_STORE_PATH",
       pathDefaultTenantStore(),
     ),
+    usageStorePath: env(
+      "USAGE_STORE_PATH",
+      pathDefaultUsageStore(),
+    ),
     adminAuthStorePath: env(
       "ADMIN_AUTH_STORE_PATH",
       `${process.cwd()}/data/admin-auth.json`,
@@ -310,4 +316,8 @@ function parseHostingCostClass(
 
 function pathDefaultTenantStore(): string {
   return `${process.cwd()}/data/tenants.json`;
+}
+
+function pathDefaultUsageStore(): string {
+  return `${process.cwd()}/data/usage.json`;
 }

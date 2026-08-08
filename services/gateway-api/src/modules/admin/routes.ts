@@ -361,13 +361,20 @@ export async function registerAdminRoutes(
     }
   });
 
-  // Usage is process-lifetime only. Credential revoke/delete must never reset these counters.
+  // Usage is persisted to disk; credential revoke/delete must never reset these counters.
   app.get("/admin/v1/usage", async (req, reply) => {
     try {
       await requireAdmin(req, config, authStore);
+      const snap = usage.snapshot();
+      const restoreHint = snap.restored
+        ? ` Restored from ${snap.restoreSource || "disk"}.`
+        : "";
       return reply.send({
-        usage: usage.snapshot(),
-        note: "In-process counters since Gateway start (resets only on process restart — not on tenant delete/revoke). GB is a proxy (maxParticipants × bitrate), not measured WebRTC bytes.",
+        usage: snap,
+        note:
+          "Persisted usage counters (survive Gateway restarts). Not cleared by tenant/key delete." +
+          restoreHint +
+          " GB is a proxy (maxParticipants × bitrate), not measured WebRTC bytes.",
       });
     } catch (err) {
       return sendError(req, reply, err);
@@ -511,6 +518,15 @@ export async function registerAdminRoutes(
           tenantId: string;
           keyId: string;
         };
+        const q = req.query as { hard?: string };
+        // hard=1 → remove key row; default → soft revoke (key stops working, row stays)
+        if (q.hard === "1" || q.hard === "true") {
+          const ok = await credentials.deleteKey(tenantId, keyId);
+          if (!ok) {
+            throw new HttpError(404, ERROR_CODES.NOT_FOUND, "Key not found");
+          }
+          return reply.send({ deleted: true, tenantId, keyId });
+        }
         const ok = await credentials.revokeKey(tenantId, keyId);
         if (!ok) {
           throw new HttpError(404, ERROR_CODES.NOT_FOUND, "Key not found");
